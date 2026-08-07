@@ -137,18 +137,20 @@ def extract_at_point(lat, lon, data_xr, vars_list):
 # ============================================================================
 # FUNCTION: Create map with raster overlay (FIXED)
 # ============================================================================
-def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, norm, label_dict):
+def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm, label_dict):
     """Create folium map with raster data overlay + selected point"""
     
     # Get data and coordinates
     if layer_name == "Risk":
         raster_data = data_xr['risk_pdp_shap'].values
+        color_dict = risk_9_colors
     else:  # Priority
         raster_data = data_xr['priority_zones_regulatory'].values
+        color_dict = priority_4_colors
     
     # Get water mask from LU layer (80 = water)
     lu_data = data_xr['LU'].values
-    water_mask = (lu_data == 80)  # True where water
+    water_mask = (lu_data == 80)
     
     lats = data_xr['latitude'].values
     lons = data_xr['longitude'].values
@@ -157,32 +159,39 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
     lat_min, lat_max = lats.min(), lats.max()
     lon_min, lon_max = lons.min(), lons.max()
     
-    # Create matplotlib figure with transparent background
+    # Create matplotlib figure with NO PADDING
     fig, ax = plt.subplots(figsize=(10, 10), dpi=80, facecolor='none')
+    fig.patch.set_alpha(0)  # Fully transparent figure background
+    
+    # Remove all spines and margins
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.patch.set_alpha(0)
     
     # Mask water areas using LU layer
     raster_masked = np.ma.masked_where(water_mask, raster_data)
     
-    # Convert color dict to ListedColormap
-    cmap_list = ListedColormap([cmap_dict[k] for k in sorted(cmap_dict.keys())])
-    cmap_list.set_bad(alpha=0)  # Make water (masked) areas fully transparent
-    
-    # Plot raster with colormap
+    # Plot raster using the actual cmap
     im = ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                   cmap=cmap_list, norm=norm, origin='lower', alpha=0.9)
+                   cmap=cmap_obj, norm=norm, origin='lower', alpha=0.9, 
+                   interpolation='nearest')
     
-    # Styling (clean)
+    # Remove all ticks and labels
     ax.set_xlabel("")
     ax.set_ylabel("")
     ax.set_title("")
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.patch.set_alpha(0)  # Transparent axes background
     
-    # Convert to PNG + base64 (preserve transparency)
+    # Remove all margins/padding
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    
+    # Convert to PNG + base64 with FULL transparency
     img_buffer = BytesIO()
-    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, pad_inches=0, 
-                facecolor='none', transparent=True)
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, 
+                facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.read()).decode()
     plt.close()
@@ -194,7 +203,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
         tiles="OpenStreetMap"
     )
     
-    # Overlay raster image (transparent background)
+    # Overlay raster image (no black edges)
     img_url = f"data:image/png;base64,{img_base64}"
     folium.raster_layers.ImageOverlay(
         image=img_url,
@@ -204,26 +213,37 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
         cross_origin=False
     ).add_to(m)
     
-    # Get value at selected point for dynamic marker color
+    # Get value at selected point
+    if layer_name == "Risk":
+        layer_key = 'risk_pdp_shap'
+    else:
+        layer_key = 'priority_zones_regulatory'
+    
     try:
-        selected_value = int(float(data_xr[layer_name.lower() if layer_name == 'risk' else 'priority_zones_regulatory']
-                                   .sel(latitude=lat, longitude=lon, method='nearest').values))
+        selected_value = int(float(data_xr[layer_key].sel(latitude=lat, longitude=lon, method='nearest').values))
+        selected_value = max(1, min(selected_value, len(color_dict)))
     except:
         selected_value = 1
     
-    # Dynamic marker color based on risk/priority value
-    marker_color = cmap_dict.get(selected_value, 'red')
+    # Get marker color from cmap
+    try:
+        norm_value = norm(selected_value)
+        rgba_color = cmap_obj(norm_value)
+        import matplotlib.colors as mcolors
+        marker_color = mcolors.rgb2hex(rgba_color[:3])
+    except:
+        marker_color = color_dict.get(selected_value, 'red')
     
-    # Add selected point with dynamic color
+    # Add selected point (small marker)
     folium.CircleMarker(
         location=[lat, lon],
-        radius=14,
-        popup=f"{lat:.3f}°N, {lon:.3f}°E<br>Value: {selected_value}",
+        radius=8,
+        popup=f"<b>{layer_name}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value}",
         color=marker_color,
         fill=True,
         fillColor=marker_color,
-        fillOpacity=1.0,
-        weight=3
+        fillOpacity=0.95,
+        weight=2
     ).add_to(m)
     
     # Add legend (TOP-RIGHT)
@@ -235,9 +255,9 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
     <b>{layer_name}</b><br>
     '''
     
-    for i in sorted(cmap_dict.keys()):
+    for i in sorted(color_dict.keys()):
         label = label_dict.get(i, str(i))
-        legend_html += f'<i style="background:{cmap_dict[i]}; width: 14px; height: 14px; float: left; margin-right: 6px; border-radius: 1px;"></i><span style="font-size:10px;">{label}</span><br>'
+        legend_html += f'<i style="background:{color_dict[i]}; width: 14px; height: 14px; float: left; margin-right: 6px; border-radius: 1px;"></i><span style="font-size:10px;">{label}</span><br>'
     
     legend_html += '</div>'
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -267,7 +287,7 @@ with tab1:
         st.subheader("(a) Contamination Risk (1-9 levels)")
         risk_map = create_map_with_raster_overlay(
             lat_input, lon_input, data_xr,
-            "Risk", risk_9_colors, norm_risk, RISK_LABELS  # ← Changed cmap_risk to risk_9_colors
+            "Risk", cmap_risk, norm_risk, RISK_LABELS  # ← Pass cmap_risk (not dict)
         )
         st_folium(risk_map, width=550, height=550, key="risk_map")
     
@@ -275,7 +295,7 @@ with tab1:
         st.subheader("(b) Management Priority (1-4 levels)")
         priority_map = create_map_with_raster_overlay(
             lat_input, lon_input, data_xr,
-            "Priority", priority_4_colors, norm_priority, PRIORITY_LABELS  # ← Changed cmap_priority to priority_4_colors
+            "Priority", cmap_priority, norm_priority, PRIORITY_LABELS  # ← Pass cmap_priority (not dict)
         )
         st_folium(priority_map, width=550, height=550, key="priority_map")
 
