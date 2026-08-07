@@ -275,8 +275,11 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
 # ============================================================================
 # FUNCTION: Create prediction map with COLORBAR IN LEGEND
 # ============================================================================
-def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None, label_dict=None, color_dict=None):
-    """Create folium map for prediction layers with colorbar inside legend"""
+# ============================================================================
+# FUNCTION: Create prediction map with HORIZONTAL COLORBAR AT TOP
+# ============================================================================
+def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None, title=""):
+    """Create folium map for prediction layers with horizontal colorbar at top"""
     
     try:
         raster_data = data_xr[layer_name].values
@@ -294,7 +297,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     
     raster_masked = np.ma.masked_where(water_mask, raster_data)
     
-    # Create figure for main map (NO colorbar)
+    # Create main map figure (NO colorbar)
     fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
     fig.patch.set_alpha(0)
     
@@ -304,7 +307,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     ax.spines['left'].set_visible(False)
     ax.patch.set_alpha(0)
     
-    # Plot with appropriate normalization
+    # Plot
     if norm_obj is not None:
         im = ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
                        cmap=cmap_obj, norm=norm_obj, origin='lower', alpha=0.9,
@@ -322,10 +325,8 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     ax.set_xlim([lon_min, lon_max])
     ax.set_ylim([lat_min, lat_max])
     
-    # Remove all padding
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
     
-    # Save main map
     img_buffer = BytesIO()
     plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, 
                 facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
@@ -333,21 +334,22 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     img_base64 = base64.b64encode(img_buffer.read()).decode()
     plt.close()
     
-    # Create colorbar as separate image for legend
-    fig_cbar, ax_cbar = plt.subplots(figsize=(1, 4), dpi=100)
+    # Create TINY horizontal colorbar for legend
+    fig_cbar, ax_cbar = plt.subplots(figsize=(2.5, 0.4), dpi=80)
     if norm_obj is not None:
         cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_obj, cmap=cmap_obj), 
-                           cax=ax_cbar, orientation='vertical')
+                           cax=ax_cbar, orientation='horizontal', pad=0.01)
     else:
-        norm_cont = Normalize(vmin=np.nanmin(raster_masked), vmax=np.nanmax(raster_masked))
+        vmin = np.nanmin(raster_masked)
+        vmax = np.nanmax(raster_masked)
+        norm_cont = Normalize(vmin=vmin, vmax=vmax)
         cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_cont, cmap=cmap_obj), 
-                           cax=ax_cbar, orientation='vertical')
-    cbar.set_label(layer_name, fontsize=8)
+                           cax=ax_cbar, orientation='horizontal', pad=0.01)
+    cbar.ax.tick_params(labelsize=7)
     
-    # Save colorbar
     cbar_buffer = BytesIO()
-    plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=100,
-                facecolor='white', transparent=False, pad_inches=0.1)
+    plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
+                facecolor='white', transparent=False, pad_inches=0.05)
     cbar_buffer.seek(0)
     cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
     plt.close()
@@ -359,7 +361,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         tiles="OpenStreetMap"
     )
     
-    # Overlay main raster
+    # Overlay
     img_url = f"data:image/png;base64,{img_base64}"
     folium.raster_layers.ImageOverlay(
         image=img_url,
@@ -369,7 +371,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         cross_origin=False
     ).add_to(m)
     
-    # Get value at point
+    # Marker
     try:
         selected_value = float(data_xr[layer_name].sel(latitude=lat, longitude=lon, method='nearest').values)
     except:
@@ -378,7 +380,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     folium.CircleMarker(
         location=[lat, lon],
         radius=6,
-        popup=f"<b>{layer_name}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value:.3f}",
+        popup=f"<b>{title}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value:.3f}",
         color='red',
         fill=True,
         fillColor='red',
@@ -386,13 +388,13 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         weight=2
     ).add_to(m)
     
-    # Legend with colorbar inside
+    # Legend with tiny horizontal colorbar at TOP CENTER
     legend_html = f'''
-    <div style="position: fixed; top: 10px; right: 10px; width: 180px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
-                border-radius: 5px; padding: 8px; text-align: center;">
-    <b style="font-size: 11px;">{layer_name}</b><br>
-    <img src="data:image/png;base64,{cbar_base64}" style="width: 100%; height: auto; margin-top: 5px;">
+    <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
+                background-color: white; border:1px solid grey; z-index:9999; 
+                border-radius: 3px; padding: 4px;">
+    <div style="font-size: 10px; font-weight: bold; text-align: center; margin-bottom: 3px;">{title}</div>
+    <img src="data:image/png;base64,{cbar_base64}" style="width: 200px; height: auto;">
     </div>
     '''
     
@@ -426,7 +428,7 @@ with tab1:
             lat_input, lon_input, data_xr,
             "Risk", cmap_risk, norm_risk, RISK_LABELS, risk_9_colors
         )
-        st_folium(risk_map, width=450, height=450, key=f"risk_map_{lat_input}_{lon_input}")
+        st_folium(risk_map, width=350, height=350, key=f"risk_map_{lat_input}_{lon_input}")
     
     with col2:
         st.subheader("Management Priority (1-4)")
@@ -434,8 +436,7 @@ with tab1:
             lat_input, lon_input, data_xr,
             "Priority", cmap_priority, norm_priority, PRIORITY_LABELS, priority_4_colors
         )
-        st_folium(priority_map, width=450, height=450, key=f"priority_map_{lat_input}_{lon_input}")
-
+        st_folium(priority_map, width=350, height=350, key=f"priority_map_{lat_input}_{lon_input}")
 # ============================================================================
 # TAB 2: FEATURE IMPORTANCE
 # ============================================================================
@@ -523,70 +524,66 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("SHAP Index (Continuous)")
         shap_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                        'index_shap', 'RdBu_r', None)
+                                        'index_shap', 'RdBu_r', title="SHAP Index")
         if shap_map:
-            st_folium(shap_map, width=450, height=400, key=f"shap_index_map_{lat_input}_{lon_input}")
+            st_folium(shap_map, width=350, height=350, key=f"shap_index_map_{lat_input}_{lon_input}")
     
     with col2:
-        st.subheader("SHAP Uncertainty (Std)")
         shap_std_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                            'index_shap_std', 'Greys', None)
+                                            'index_shap_std', 'Greys', title="SHAP Std Dev")
         if shap_std_map:
-            st_folium(shap_std_map, width=450, height=400, key=f"shap_std_map_{lat_input}_{lon_input}")
+            st_folium(shap_std_map, width=350, height=350, key=f"shap_std_map_{lat_input}_{lon_input}")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("SHAP Class (1-5)")
         shap_class_cmap = ListedColormap([shap_class_colors[k] for k in sorted(shap_class_colors.keys())])
         shap_class_norm = BoundaryNorm(np.arange(0.5, 6.5, 1), len(shap_class_colors))
         shap_class_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                              'index_shap_class', shap_class_cmap, shap_class_norm)
+                                              'index_shap_class', shap_class_cmap, shap_class_norm, 
+                                              title="SHAP Class (1-5)")
         if shap_class_map:
-            st_folium(shap_class_map, width=450, height=400, key=f"shap_class_map_{lat_input}_{lon_input}")
+            st_folium(shap_class_map, width=350, height=350, key=f"shap_class_map_{lat_input}_{lon_input}")
     
     with col2:
-        st.subheader("SHAP Entropy (Normalized)")
         shap_entropy_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                                'index_shap_entropy_norm', 'YlGnBu', None)
+                                                'index_shap_entropy_norm', 'YlGnBu', 
+                                                title="SHAP Entropy (Norm)")
         if shap_entropy_map:
-            st_folium(shap_entropy_map, width=450, height=400, key=f"shap_entropy_map_{lat_input}_{lon_input}")
+            st_folium(shap_entropy_map, width=350, height=350, key=f"shap_entropy_map_{lat_input}_{lon_input}")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Predicted Nitrate (mg/L)")
         y_hat_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                         'y_hat', 'YlOrRd', None)
+                                         'y_hat', 'YlOrRd', title="Predicted Nitrate (mg/L)")
         if y_hat_map:
-            st_folium(y_hat_map, width=450, height=400, key=f"y_hat_map_{lat_input}_{lon_input}")
+            st_folium(y_hat_map, width=350, height=350, key=f"y_hat_map_{lat_input}_{lon_input}")
     
     with col2:
-        st.subheader("Y-Hat Uncertainty (Std)")
         y_hat_std_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                             'y_hat_std', 'Greys', None)
+                                             'y_hat_std', 'Greys', title="Y-Hat Std Dev")
         if y_hat_std_map:
-            st_folium(y_hat_std_map, width=450, height=400, key=f"y_hat_std_map_{lat_input}_{lon_input}")
+            st_folium(y_hat_std_map, width=350, height=350, key=f"y_hat_std_map_{lat_input}_{lon_input}")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Y-Hat Class (1-5)")
         y_hat_class_cmap = ListedColormap([y_hat_class_colors[k] for k in sorted(y_hat_class_colors.keys())])
         y_hat_class_norm = BoundaryNorm(np.arange(0.5, 6.5, 1), len(y_hat_class_colors))
         y_hat_class_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                               'y_hat_log_class', y_hat_class_cmap, y_hat_class_norm)
+                                               'y_hat_log_class', y_hat_class_cmap, y_hat_class_norm,
+                                               title="Y-Hat Class (1-5)")
         if y_hat_class_map:
-            st_folium(y_hat_class_map, width=450, height=400, key=f"y_hat_class_map_{lat_input}_{lon_input}")
+            st_folium(y_hat_class_map, width=350, height=350, key=f"y_hat_class_map_{lat_input}_{lon_input}")
     
     with col2:
-        st.subheader("Y-Hat Entropy (Normalized)")
         y_hat_entropy_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                                 'y_hat_log_entropy_norm', 'YlGnBu', None)
+                                                 'y_hat_log_entropy_norm', 'YlGnBu',
+                                                 title="Y-Hat Entropy (Norm)")
         if y_hat_entropy_map:
-            st_folium(y_hat_entropy_map, width=450, height=400, key=f"y_hat_entropy_map_{lat_input}_{lon_input}")
+            st_folium(y_hat_entropy_map, width=350, height=350, key=f"y_hat_entropy_map_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 5: COMPLETE DATA TABLE
