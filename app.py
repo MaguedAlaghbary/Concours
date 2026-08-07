@@ -897,187 +897,174 @@ with tab1:
 # ============================================================================
 # TAB 2: FEATURE IMPORTANCE
 # ============================================================================
-with tab2:
-    st.header("🎯 Driver Attribution Maps")
+# ============================================================================
+# TAB 5: DRIVER SHAP ATTRIBUTION MAPS
+# ============================================================================
+with tab5:
+    st.header("🎯 SHAP Driver Attribution Maps (Top 4)")
     
-    st.info("Maps show which DRASTICLU parameter is the top driver (Rank 1) at each location")
+    st.info("Maps show which DRASTICLU parameter has highest SHAP values for ranks 1-4")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🗺️ Top Driver Spatial Distribution")
-        
-        # Get top driver data
-        try:
-            driver_rank_1 = data_xr['driver_rank_1'].values  # 0-7 (D, R, A, S, T, I, C, LU)
-        except:
-            st.error("Cannot load driver rank data")
-            st.stop()
-        
-        lu_data = data_xr['LU'].values
-        water_mask = (lu_data == 80)
-        driver_masked = np.ma.masked_where(water_mask, driver_rank_1)
-        
-        lats = data_xr['latitude'].values
-        lons = data_xr['longitude'].values
-        lat_min, lat_max = lats.min(), lats.max()
-        lon_min, lon_max = lons.min(), lons.max()
-        
-        # Create figure
-        fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
-        fig.patch.set_alpha(0)
-        
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.patch.set_alpha(0)
-        
-        # Create colormap for drivers (0-7 = D, R, A, S, T, I, C, LU)
-        driver_colors = {
-            0: parameters_8_colors[1],  # D
-            1: parameters_8_colors[2],  # R
-            2: parameters_8_colors[3],  # A
-            3: parameters_8_colors[4],  # S
-            4: parameters_8_colors[5],  # T
-            5: parameters_8_colors[6],  # I
-            6: parameters_8_colors[7],  # C
-            7: parameters_8_colors[8],  # LU
-        }
-        
-        driver_cmap = ListedColormap([driver_colors[k] for k in range(8)])
-        norm_driver = BoundaryNorm(np.arange(-0.5, 8.5, 1), 8)
-        
-        im = ax.imshow(driver_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                      cmap=driver_cmap, norm=norm_driver, origin='lower', alpha=0.9,
-                      interpolation='nearest')
-        
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xlim([lon_min, lon_max])
-        ax.set_ylim([lat_min, lat_max])
-        
-        plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
-        
-        # Save as PNG
-        img_buffer = BytesIO()
-        plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
-                   facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
-        img_buffer.seek(0)
-        img_base64 = base64.b64encode(img_buffer.read()).decode()
-        plt.close()
-         
-        # Create horizontal colorbar
-        fig_cbar, ax_cbar = plt.subplots(figsize=(2, 0.25), dpi=80)
-        cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_driver, cmap=driver_cmap), 
-                           cax=ax_cbar, orientation='horizontal', pad=0.01)
-        cbar.set_label('Top Driver', fontsize=8)
-        # Let matplotlib set ticks automatically
-        cbar.ax.tick_params(labelsize=7)
-        
-        cbar_buffer = BytesIO()
-        plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
-                    facecolor='white', transparent=False, pad_inches=0.02)
-        cbar_buffer.seek(0)
-        cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
-        plt.close()
-        
-        # Create folium map
-        m = folium.Map(
-            location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-            zoom_start=10,
-            tiles="OpenStreetMap"
-        )
-        
-        # Overlay
-        img_url = f"data:image/png;base64,{img_base64}"
-        folium.raster_layers.ImageOverlay(
-            image=img_url,
-            bounds=[[lat_min, lon_min], [lat_max, lon_max]],
-            opacity=0.85,
-            interactive=True,
-            cross_origin=False
-        ).add_to(m)
-        
-        # Add marker
-        try:
-            top_driver_idx = int(data_xr['driver_rank_1'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
-            top_driver = DRIVER_MAP.get(top_driver_idx, '?')
-            popup_text = f"Top Driver: {top_driver}<br>{lat_input:.4f}°N, {lon_input:.4f}°E"
-            marker_color = driver_colors.get(top_driver_idx, '#CCCCCC')
-        except:
-            popup_text = f"{lat_input:.4f}°N, {lon_input:.4f}°E"
-            marker_color = 'red'
-        
-        folium.CircleMarker(
-            location=[lat_input, lon_input],
-            radius=6,
-            popup=popup_text,
-            color=marker_color,
-            fill=True,
-            fillColor=marker_color,
-            fillOpacity=0.95,
-            weight=2
-        ).add_to(m)
-        
-        # Legend
-        legend_html = f'''
-        <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
-                    background-color: white; border:1px solid grey; z-index:9999; 
-                    border-radius: 2px; padding: 3px;">
-        <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 2px;">Top Driver (Rank 1)</div>
-        <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto;">
-        </div>
-        '''
-        
-        m.get_root().html.add_child(folium.Element(legend_html))
-        
-        st_folium(m, width=350, height=350, key=f"driver_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        st.subheader("📋 Top 4 Drivers at Selected Location")
-        
-        driver_ranks = extract_at_point(lat_input, lon_input, data_xr,
-                                        [f'driver_rank_{i}' for i in range(1, 5)])
-        
-        rank_data = []
+    # Get all 4 driver SHAP layers
+    try:
+        driver_shap_data = {}
         for i in range(1, 5):
-            rank_val = int(driver_ranks.get(f'driver_rank_{i}', np.nan))
-            if not np.isnan(rank_val):
-                param_code = DRIVER_MAP.get(rank_val, f'Feature {rank_val}')
-                color = parameters_8_colors.get(rank_val + 1, '#CCCCCC')
-                rank_data.append({
-                    'Rank': i,
-                    'Driver': param_code,
-                    'Color': color
-                })
+            driver_shap_data[i] = data_xr[f'driver_shap_{i}'].values
+    except:
+        st.error("Cannot load driver SHAP data")
+        st.stop()
+    
+    # Water mask
+    lu_data = data_xr['LU'].values
+    water_mask = (lu_data == 80)
+    lats = data_xr['latitude'].values
+    lons = data_xr['longitude'].values
+    lat_min, lat_max = lats.min(), lats.max()
+    lon_min, lon_max = lons.min(), lons.max()
+    
+    # Create 2x2 grid
+    cols = st.columns(2)
+    
+    for shap_rank in range(1, 5):
+        col_idx = (shap_rank - 1) % 2
+        col = cols[col_idx]
         
-        if rank_data:
-            for row in rank_data:
-                st.markdown(
-                    f'<div style="padding: 10px; background-color: {row["Color"]}22; border-left: 4px solid {row["Color"]}; margin: 8px 0; border-radius: 3px;">'
-                    f'<b style="font-size: 12px;">Rank {row["Rank"]}: {row["Driver"]}</b></div>',
-                    unsafe_allow_html=True
-                )
-        
-        st.markdown("---")
-        st.subheader("📋 Parameter Color Guide")
-        param_list = [
-            ('D', 'Depth to Water', 1),
-            ('R', 'Recharge', 2),
-            ('A', 'Aquifer Media', 3),
-            ('S', 'Soil Media', 4),
-            ('T', 'Topography', 5),
-            ('I', 'Impact Vadose', 6),
-            ('C', 'Conductivity', 7),
-            ('LU', 'Land Use', 8),
-        ]
-        
-        for code, name, param_num in param_list:
+        with col:
+            st.subheader(f"SHAP Rank {shap_rank}")
+            
+            # Get data
+            shap_masked = np.ma.masked_where(water_mask, driver_shap_data[shap_rank])
+            
+            # Create figure
+            fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
+            fig.patch.set_alpha(0)
+            
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.patch.set_alpha(0)
+            
+            # Create colormap for drivers (0-7 = D, R, A, S, T, I, C, LU)
+            driver_colors = {
+                0: parameters_8_colors[1],  # D
+                1: parameters_8_colors[2],  # R
+                2: parameters_8_colors[3],  # A
+                3: parameters_8_colors[4],  # S
+                4: parameters_8_colors[5],  # T
+                5: parameters_8_colors[6],  # I
+                6: parameters_8_colors[7],  # C
+                7: parameters_8_colors[8],  # LU
+            }
+            
+            driver_cmap = ListedColormap([driver_colors[k] for k in range(8)])
+            norm_driver = BoundaryNorm(np.arange(-0.5, 8.5, 1), 8)
+            
+            im = ax.imshow(shap_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+                          cmap=driver_cmap, norm=norm_driver, origin='lower', alpha=0.9,
+                          interpolation='nearest')
+            
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_xlim([lon_min, lon_max])
+            ax.set_ylim([lat_min, lat_max])
+            
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
+            
+            # Save as PNG
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
+                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
+            img_buffer.seek(0)
+            img_base64 = base64.b64encode(img_buffer.read()).decode()
+            plt.close()
+            
+            # Create horizontal colorbar
+            fig_cbar, ax_cbar = plt.subplots(figsize=(1.8, 0.25), dpi=80)
+            cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_driver, cmap=driver_cmap), 
+                               cax=ax_cbar, orientation='horizontal', pad=0.01)
+            cbar.ax.tick_params(labelsize=6)
+            
+            cbar_buffer = BytesIO()
+            plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
+                        facecolor='white', transparent=False, pad_inches=0.02)
+            cbar_buffer.seek(0)
+            cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
+            plt.close()
+            
+            # Create folium map
+            m = folium.Map(
+                location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
+                zoom_start=10,
+                tiles="OpenStreetMap"
+            )
+            
+            # Overlay
+            img_url = f"data:image/png;base64,{img_base64}"
+            folium.raster_layers.ImageOverlay(
+                image=img_url,
+                bounds=[[lat_min, lon_min], [lat_max, lon_max]],
+                opacity=0.85,
+                interactive=True,
+                cross_origin=False
+            ).add_to(m)
+            
+            # Add marker
+            try:
+                shap_idx = int(data_xr[f'driver_shap_{shap_rank}'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
+                driver_name = DRIVER_MAP.get(shap_idx, '?')
+                popup_text = f"SHAP Rank {shap_rank}: {driver_name}<br>{lat_input:.4f}°N, {lon_input:.4f}°E"
+                marker_color = driver_colors.get(shap_idx, '#CCCCCC')
+            except:
+                popup_text = f"SHAP Rank {shap_rank}"
+                marker_color = 'red'
+            
+            folium.CircleMarker(
+                location=[lat_input, lon_input],
+                radius=6,
+                popup=popup_text,
+                color=marker_color,
+                fill=True,
+                fillColor=marker_color,
+                fillOpacity=0.95,
+                weight=2
+            ).add_to(m)
+            
+            # Legend
+            legend_html = f'''
+            <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
+                        background-color: white; border:1px solid grey; z-index:9999; 
+                        border-radius: 2px; padding: 3px;">
+            <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 2px;">SHAP Rank {shap_rank}</div>
+            <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto;">
+            </div>
+            '''
+            
+            m.get_root().html.add_child(folium.Element(legend_html))
+            
+            st_folium(m, width=380, height=380, key=f"driver_shap_{shap_rank}_{lat_input}_{lon_input}")
+    
+    # Legend panel
+    st.markdown("---")
+    st.subheader("📋 Parameter Color Guide (Paul Tol Bright)")
+    
+    legend_cols = st.columns(4)
+    param_list = [
+        ('D', 'Depth to Water', 1),
+        ('R', 'Recharge', 2),
+        ('A', 'Aquifer Media', 3),
+        ('S', 'Soil Media', 4),
+        ('T', 'Topography', 5),
+        ('I', 'Impact Vadose', 6),
+        ('C', 'Conductivity', 7),
+        ('LU', 'Land Use', 8),
+    ]
+    
+    for idx, (code, name, param_num) in enumerate(param_list):
+        with legend_cols[idx % 4]:
             color = parameters_8_colors[param_num]
             st.markdown(
-                f'<div style="padding: 6px; background-color: {color}; color: white; border-radius: 3px; margin: 3px 0;">'
-                f'<b>{code}</b> - {name}</div>',
+                f'<div style="padding: 8px; background-color: {color}; color: white; border-radius: 4px; text-align: center; font-weight: bold;">{code}<br><span style="font-size: 9px;">{name}</span></div>',
                 unsafe_allow_html=True
             )
 # ============================================================================
