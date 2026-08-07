@@ -152,7 +152,7 @@ cmap_vulnerability = mcolors.LinearSegmentedColormap.from_list(
 # Use viridis for uncertainty (std dev)
 cmap_std = plt.cm.viridis
 
-cmap_entropy = cmo.davos
+cmap_entropy =  plt.cm.davos
 
 # 5-class categorical for defuzzified layers (with labels)
 vulnerability_class_labels = {
