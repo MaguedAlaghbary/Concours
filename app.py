@@ -246,7 +246,7 @@ with tab1:
         st.subheader("(a) Contamination Risk (1-9 levels)")
         risk_map = create_map_with_raster_overlay(
             lat_input, lon_input, data_xr,
-            "Risk", cmap_risk, norm_risk, RISK_LABELS
+            "Risk", risk_9_colors, norm_risk, RISK_LABELS  # ← Changed cmap_risk to risk_9_colors
         )
         st_folium(risk_map, width=550, height=550, key="risk_map")
     
@@ -254,7 +254,7 @@ with tab1:
         st.subheader("(b) Management Priority (1-4 levels)")
         priority_map = create_map_with_raster_overlay(
             lat_input, lon_input, data_xr,
-            "Priority", cmap_priority, norm_priority, PRIORITY_LABELS
+            "Priority", priority_4_colors, norm_priority, PRIORITY_LABELS  # ← Changed cmap_priority to priority_4_colors
         )
         st_folium(priority_map, width=550, height=550, key="priority_map")
 
