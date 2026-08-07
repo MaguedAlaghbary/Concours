@@ -895,10 +895,7 @@ with tab1:
         )
         st_folium(priority_map, width=350, height=350, key=f"priority_map_{lat_input}_{lon_input}")
 # ============================================================================
-# TAB 2: FEATURE IMPORTANCE
-# ============================================================================
-# ============================================================================
-# TAB 5: DRIVER SHAP ATTRIBUTION MAPS
+# TAB 2: RIVER SHAP ATTRIBUTION MAPS
 # ============================================================================
 with tab2:
     st.header("🎯 Driver Attribution Analysis (Rank & SHAP)")
@@ -1074,7 +1071,7 @@ with tab2:
             img_url = f"data:image/png;base64,{img_base64}"
             folium.raster_layers.ImageOverlay(
                 image=img_url,
-                bounds=[[lat_min, lon_min], [lat_max, lon_map]],
+                bounds=[[lat_min, lon_min], [lat_max, lon_max]],
                 opacity=0.85,
                 interactive=True,
                 cross_origin=False
