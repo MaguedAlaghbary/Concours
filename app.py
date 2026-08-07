@@ -197,7 +197,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     # Add colorbar with labels
     cbar = plt.colorbar(im, ax=ax, orientation='vertical', pad=0.02, shrink=0.8)
     cbar.set_label(layer_name, fontsize=10)
-    cbar.ax.set_yticklabels([str(i) for i in sorted(color_dict.keys())])
+    #cbar.ax.set_yticklabels([str(i) for i in sorted(color_dict.keys())])
     
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     
