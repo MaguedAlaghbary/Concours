@@ -624,6 +624,26 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
+        # index_shap: 0-10 (continuous vulnerability)
+        norm_shap = Normalize(vmin=0, vmax=10)
+        shap_map = create_prediction_map(lat_input, lon_input, data_xr,
+                                        'index_shap', cmap_vulnerability, norm_shap,
+                                        title=PREDICTION_TITLES['index_shap'])
+        if shap_map:
+            st_folium(shap_map, width=350, height=350, key=f"shap_index_map_{lat_input}_{lon_input}")
+    
+    with col2:
+        # index_shap_std: 12-26 (uncertainty, viridis)
+        norm_shap_std = Normalize(vmin=12, vmax=26)
+        shap_std_map = create_prediction_map(lat_input, lon_input, data_xr,
+                                            'index_shap_std', cmap_std, norm_shap_std,
+                                            title=PREDICTION_TITLES['index_shap_std'])
+        if shap_std_map:
+            st_folium(shap_std_map, width=350, height=350, key=f"shap_std_map_{lat_input}_{lon_input}")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
         # index_shap_class: 1-5 (CATEGORICAL)
         vuln_class_cmap = ListedColormap([vulnerability_5_colors[k] for k in sorted(vulnerability_5_colors.keys())])
         norm_shap_class = BoundaryNorm(np.arange(0.5, 6.5, 1), vuln_class_cmap.N)
