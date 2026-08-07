@@ -170,22 +170,22 @@ except:
     )
 
 # 5-class categorical for defuzzified layers (with labels)
-vulnerability_class_labels = {
-    1: "Very Low",
-    2: "Low",
-    3: "Moderate",
-    4: "High",
-    5: "Very High"
+# 5-class categorical colormaps (for defuzzified)
+vulnerability_5_colors = {
+    1: '#440154',  # Very Low - Dark purple
+    2: '#31688E',  # Low - Blue
+    3: '#35B779',  # Moderate - Green
+    4: '#FDE724',  # High - Yellow
+    5: '#CC4C02',  # Very High - Dark orange
 }
 
-nitrate_class_labels = {
-    1: "Very Low",
-    2: "Low",
-    3: "Moderate",
-    4: "High",
-    5: "Very High"
+nitrate_5_colors = {
+    1: '#FFEDA0',  # Very Low - Light yellow
+    2: '#FED976',  # Low - Yellow
+    3: '#FEB24C',  # Moderate - Orange
+    4: '#F03B20',  # High - Red-orange
+    5: '#BD0026',  # Very High - Dark red
 }
-
 
 # ============================================================================
 # SIDEBAR: LOCATION INPUT
@@ -627,14 +627,15 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        # index_shap_class: 1-5 (SHOW CLASS NAMES ONLY)
-        norm_class = BoundaryNorm(np.arange(0.5, 6.5, 1), 256)
-        shap_class_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                              'index_shap_class', cmap_vulnerability, norm_class,
-                                              title=PREDICTION_TITLES['index_shap_class'],
-                                              class_labels=vulnerability_class_labels)
-        if shap_class_map:
-            st_folium(shap_class_map, width=350, height=350, key=f"shap_class_map_{lat_input}_{lon_input}")
+        # index_shap_class: 1-5 (CATEGORICAL - like risk maps)
+        vuln_class_cmap = ListedColormap([vulnerability_5_colors[k] for k in sorted(vulnerability_5_colors.keys())])
+        norm_shap_class = BoundaryNorm(np.arange(0.5, 6.5, 1), vuln_class_cmap.N)
+        shap_class_map = create_map_with_raster_overlay(
+            lat_input, lon_input, data_xr,
+            "Defuzzified Specific Vulnerability", vuln_class_cmap, norm_shap_class, 
+            vulnerability_class_labels, vulnerability_5_colors
+        )
+        st_folium(shap_class_map, width=350, height=350, key=f"shap_class_map_{lat_input}_{lon_input}")
     
     with col2:
         # index_shap_entropy_norm: 0-1 (entropy, davos)
@@ -648,7 +649,7 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        # y_hat: 10-100 (continuous nitrate CONTAMINATION, NOT concentration)
+        # y_hat: 10-100 (continuous nitrate)
         norm_yhat = Normalize(vmin=10, vmax=100)
         y_hat_map = create_prediction_map(lat_input, lon_input, data_xr,
                                          'y_hat', cmap_nitrate, norm_yhat,
@@ -668,14 +669,15 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        # y_hat_log_class: 1-5 (SHOW CLASS NAMES ONLY)
-        norm_yhat_class = BoundaryNorm(np.arange(0.5, 6.5, 1), 256)
-        y_hat_class_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                               'y_hat_log_class', cmap_nitrate, norm_yhat_class,
-                                               title=PREDICTION_TITLES['y_hat_log_class'],
-                                               class_labels=nitrate_class_labels)
-        if y_hat_class_map:
-            st_folium(y_hat_class_map, width=350, height=350, key=f"y_hat_class_map_{lat_input}_{lon_input}")
+        # y_hat_log_class: 1-5 (CATEGORICAL - like risk maps)
+        nitrate_class_cmap = ListedColormap([nitrate_5_colors[k] for k in sorted(nitrate_5_colors.keys())])
+        norm_yhat_class = BoundaryNorm(np.arange(0.5, 6.5, 1), nitrate_class_cmap.N)
+        y_hat_class_map = create_map_with_raster_overlay(
+            lat_input, lon_input, data_xr,
+            "Defuzzified NO₃⁻ Contamination", nitrate_class_cmap, norm_yhat_class, 
+            nitrate_class_labels, nitrate_5_colors
+        )
+        st_folium(y_hat_class_map, width=350, height=350, key=f"y_hat_class_map_{lat_input}_{lon_input}")
     
     with col2:
         # y_hat_log_entropy_norm: 0-1 (entropy, davos)
@@ -685,7 +687,6 @@ with tab4:
                                                  title=PREDICTION_TITLES['y_hat_log_entropy_norm'])
         if y_hat_entropy_map:
             st_folium(y_hat_entropy_map, width=350, height=350, key=f"y_hat_entropy_map_{lat_input}_{lon_input}")
-
 # ============================================================================
 # TAB 5: COMPLETE DATA TABLE
 # ============================================================================
