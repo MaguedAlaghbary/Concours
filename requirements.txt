@@ -1,0 +1,8 @@
+streamlit==1.28.1
+streamlit-folium==0.15.0
+xarray==2023.12.0
+folium==0.14.0
+numpy==1.24.3
+pandas==2.0.3
+netCDF4==1.6.5
+matplotlib==3.7.2
