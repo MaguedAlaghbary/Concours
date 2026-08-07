@@ -150,8 +150,7 @@ cmap_vulnerability = mcolors.LinearSegmentedColormap.from_list(
 )
 
 # Use viridis for uncertainty (std dev)
-import matplotlib.cm as cm
-cmap_std = cm.get_cmap('viridis')
+cmap_std = plt.cm.viridis
 
 # Use davos for entropy (from cmocean)
 try:
