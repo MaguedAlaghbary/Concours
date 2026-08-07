@@ -152,10 +152,10 @@ cmap_vulnerability = mcolors.LinearSegmentedColormap.from_list(
 # Use viridis for uncertainty (std dev)
 cmap_std = plt.cm.viridis
 
-# Use davos for entropy (from cmocean) - use fallback teal colormap
+# Use davos-inspired for entropy - teal colormap (low entropy = light, high = dark)
 cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
-    'davos',
-    ['#F0F9FF', '#B3E0F2', '#5AB4AC', '#1A7A7A', '#084B4B']
+    'davos_teal',
+    ['#F0FFFF', '#A7D8DE', '#5A9FA5', '#2F5F66', '#0D2626']
 )
 
 # Use davos for entropy (from cmocean)
@@ -463,21 +463,20 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     
     # Legend with tiny horizontal colorbar and class labels
     legend_html = f'''
-        <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
-                    background-color: white; border:1px solid grey; z-index:9999; 
-                    border-radius: 2px; padding: 4px;">
-        <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 3px;">{title}</div>
-        <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto; margin-bottom: 3px;">
-        '''
-        
-        # Add class labels if provided
-    if class_labels:
-        legend_html += '<div style="font-size: 8px; border-top: 1px solid #ccc; padding-top: 3px;">'
-        for class_num in sorted(class_labels.keys()):
-            legend_html += f'<div>{class_num}: {class_labels[class_num]}</div>'
-        legend_html += '</div>'
+    <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
+                background-color: white; border:2px solid #333; z-index:9999; 
+                border-radius: 3px; padding: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
+    <div style="font-size: 10px; font-weight: bold; text-align: center; margin-bottom: 4px;">{title}</div>
+    <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto; display: block; margin: 0 auto 4px;">
+    '''
     
-    legend_html += '</div>'
+    # Add class labels if provided (only for categorical maps)
+    if class_labels:
+        legend_html += '<div style="font-size: 8px; border-top: 1px solid #ddd; padding-top: 4px; margin-top: 2px; line-height: 1.3;">'
+        for class_num in sorted(class_labels.keys()):
+            legend_html += f'<div style="margin: 1px 0;"><span style="font-weight: bold;">{class_num}:</span> {class_labels[class_num]}</div>'
+        legend_html += '</div>'
+
     
     m.get_root().html.add_child(folium.Element(legend_html))
     
