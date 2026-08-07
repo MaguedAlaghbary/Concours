@@ -175,20 +175,24 @@ except:
 # CLASS LABELS FOR DEFUZZIFIED MAPS
 # ============================================================================
 
+# ============================================================================
+# CLASS LABELS FOR DEFUZZIFIED MAPS (WITH RANGES)
+# ============================================================================
+
 vulnerability_class_labels = {
-    1: "Very Low",
-    2: "Low",
-    3: "Moderate",
-    4: "High",
-    5: "Very High"
+    1: "Very Low (≤100)",
+    2: "Low (100-136)",
+    3: "Moderate (136-166)",
+    4: "High (166-174)",
+    5: "Very High (≥174)"
 }
 
 nitrate_class_labels = {
-    1: "Very Low",
-    2: "Low",
-    3: "Moderate",
-    4: "High",
-    5: "Very High"
+    1: "Very Low (≤10 mg/L)",
+    2: "Low (10-25 mg/L)",
+    3: "Moderate (25-50 mg/L)",
+    4: "High (50-100 mg/L)",
+    5: "Very High (≥100 mg/L)"
 }
 
 # 5-class categorical colormaps (for defuzzified)
@@ -629,7 +633,7 @@ with tab4:
     
     with col1:
         # index_shap: 0-10 (continuous vulnerability)
-        norm_shap = Normalize(vmin=0, vmax=10)
+        norm_shap = Normalize(vmin=80, vmax=200)
         shap_map = create_prediction_map(lat_input, lon_input, data_xr,
                                         'index_shap', cmap_vulnerability, norm_shap,
                                         title=PREDICTION_TITLES['index_shap'])
@@ -637,7 +641,7 @@ with tab4:
             st_folium(shap_map, width=350, height=350, key=f"shap_index_map_{lat_input}_{lon_input}")
     
     with col2:
-        # index_shap_std: 12-26 (uncertainty, viridis)
+        # index_shap_std: 11-27 (uncertainty, viridis)
         norm_shap_std = Normalize(vmin=12, vmax=26)
         shap_std_map = create_prediction_map(lat_input, lon_input, data_xr,
                                             'index_shap_std', cmap_std, norm_shap_std,
