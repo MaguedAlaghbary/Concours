@@ -38,26 +38,31 @@ except FileNotFoundError:
 # DEFINE COLOR SCHEMES (from Douda notebook)
 # ============================================================================
 
-# 9-level risk colormap
+# ============================================================================
+# DEFINE COLOR SCHEMES (EXACT from Douda notebook)
+# ============================================================================
+
+# 9-level risk colormap - Blue-White-Red diverging
 risk_9_colors = {
-    1: '#2B8C3F',  # Very Low - Dark Green
-    2: '#6FBF4D',  # Low - Green
-    3: '#B8D94D',  # Moderate-Low - Light Green
-    4: '#FFE135',  # Moderate - Yellow
-    5: '#FFB83C',  # Moderate-High - Orange
-    6: '#FF8D35',  # High - Dark Orange
-    7: '#FF5C35',  # Very High - Red-Orange
-    8: '#F72518',  # Critical - Red
-    9: '#8B0000'   # Emergency - Dark Red
+    1: '#053061',  # Very Low - Dark blue
+    2: '#2166AC',  # Low - Blue
+    3: '#4393C3',  # Low-Moderate - Light blue
+    4: '#cceeff',  # Moderate-Low - Pale blue
+    5: '#F7F7F7',  # Moderate - White/neutral
+    6: '#F4A582',  # Moderate-High - Pale red
+    7: '#D6604D',  # High-Moderate - Light red
+    8: '#B2182B',  # High - Red
+    9: '#67001F',  # Very High - Dark red
 }
 
-# 4-level priority colormap
-priority_4_colors = {
-    1: '#4CAF50',  # Monitor - Green
-    2: '#FFEB3B',  # Prevent - Yellow
-    3: '#FFC107',  # Remediate - Amber
-    4: '#F44336'   # Intervene - Red
+# 4-level priority colormap - Simplified risk
+risk_4_colors = {
+    1: '#2166AC',  # Low Risk - Dark blue
+    2: '#cceeff',  # Moderate Risk - Light blue
+    3: '#F4A582',  # High Risk - Light red
+    4: '#B2182B',  # Very High Risk - Dark red
 }
+
 
 # 5-level vulnerability class
 vuln_5_colors = {
