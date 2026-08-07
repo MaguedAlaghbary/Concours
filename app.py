@@ -151,8 +151,11 @@ def extract_at_point(lat, lon, data_xr, vars_list):
 # ============================================================================
 # FUNCTION: Create map with raster overlay (Risk & Priority)
 # ============================================================================
+# ============================================================================
+# FUNCTION: Create map with raster overlay (Risk & Priority - NO COLORBAR)
+# ============================================================================
 def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm, label_dict, color_dict):
-    """Create folium map with raster data overlay + selected point"""
+    """Create folium map with raster data overlay + selected point (LEGEND ONLY)"""
     
     # Get data
     if layer_name == "Risk":
@@ -170,8 +173,8 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     lat_min, lat_max = lats.min(), lats.max()
     lon_min, lon_max = lons.min(), lons.max()
     
-    # Create figure WITH colorbar
-    fig, ax = plt.subplots(figsize=(9, 9), dpi=80, facecolor='none')
+    # Create figure (NO padding)
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
     fig.patch.set_alpha(0)
     
     ax.spines['top'].set_visible(False)
@@ -183,7 +186,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     # Mask water
     raster_masked = np.ma.masked_where(water_mask, raster_data)
     
-    # Plot
+    # Plot (NO COLORBAR)
     im = ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
                    cmap=cmap_obj, norm=norm, origin='lower', alpha=0.9, 
                    interpolation='nearest')
@@ -193,18 +196,16 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     ax.set_title("")
     ax.set_xticks([])
     ax.set_yticks([])
+    ax.set_xlim([lon_min, lon_max])
+    ax.set_ylim([lat_min, lat_max])
     
-    # Add colorbar with labels
-    cbar = plt.colorbar(im, ax=ax, orientation='vertical', pad=0.02, shrink=0.8)
-    cbar.set_label(layer_name, fontsize=10)
-    #cbar.ax.set_yticklabels([str(i) for i in sorted(color_dict.keys())])
-    
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    # Remove all padding
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
     
     # Save as PNG
     img_buffer = BytesIO()
     plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, 
-                facecolor='none', edgecolor='none', transparent=True, pad_inches=0.1)
+                facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.read()).decode()
     plt.close()
@@ -216,7 +217,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
         tiles="OpenStreetMap"
     )
     
-    # Overlay
+    # Overlay (exact bounds match)
     img_url = f"data:image/png;base64,{img_base64}"
     folium.raster_layers.ImageOverlay(
         image=img_url,
@@ -226,7 +227,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
         cross_origin=False
     ).add_to(m)
     
-    # Get value at point (FRESH EACH TIME)
+    # Get value at point
     if layer_name == "Risk":
         layer_key = 'risk_pdp_shap'
     else:
@@ -238,13 +239,13 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     except:
         selected_value = 1
     
-    # Marker color from exact color dict
+    # Marker color
     marker_color = color_dict.get(selected_value, 'red')
     
-    # Add marker (UPDATES WITH LOCATION)
+    # Add marker
     folium.CircleMarker(
         location=[lat, lon],
-        radius=7,
+        radius=6,
         popup=f"<b>{layer_name}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value}",
         color=marker_color,
         fill=True,
@@ -253,18 +254,18 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
         weight=2
     ).add_to(m)
     
-    # Legend
+    # Legend ONLY (no colorbar)
     legend_html = f'''
     <div style="position: fixed; 
-                top: 10px; right: 10px; width: 180px; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:10px;
-                border-radius: 5px; padding: 8px">
-    <b>{layer_name}</b><br>
+                top: 10px; right: 10px; width: 160px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:9px;
+                border-radius: 5px; padding: 8px; font-weight: bold;">
+    {layer_name}<br>
     '''
     
     for i in sorted(color_dict.keys()):
         label = label_dict.get(i, str(i))
-        legend_html += f'<i style="background:{color_dict[i]}; width: 12px; height: 12px; float: left; margin-right: 5px; border-radius: 1px;"></i><span style="font-size:9px;">{label}</span><br>'
+        legend_html += f'<div style="margin: 2px 0;"><i style="background:{color_dict[i]}; width: 12px; height: 12px; float: left; margin-right: 5px; border-radius: 1px; display: inline-block;"></i>{label}</div>'
     
     legend_html += '</div>'
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -272,10 +273,10 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     return m
 
 # ============================================================================
-# FUNCTION: Create prediction map (flexible for any layer)
+# FUNCTION: Create prediction map with COLORBAR IN LEGEND
 # ============================================================================
 def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None, label_dict=None, color_dict=None):
-    """Create folium map for any prediction layer"""
+    """Create folium map for prediction layers with colorbar inside legend"""
     
     try:
         raster_data = data_xr[layer_name].values
@@ -293,7 +294,8 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     
     raster_masked = np.ma.masked_where(water_mask, raster_data)
     
-    fig, ax = plt.subplots(figsize=(9, 9), dpi=80, facecolor='none')
+    # Create figure for main map (NO colorbar)
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
     fig.patch.set_alpha(0)
     
     ax.spines['top'].set_visible(False)
@@ -317,26 +319,47 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     ax.set_title("")
     ax.set_xticks([])
     ax.set_yticks([])
+    ax.set_xlim([lon_min, lon_max])
+    ax.set_ylim([lat_min, lat_max])
     
-    # Add colorbar
-    cbar = plt.colorbar(im, ax=ax, orientation='vertical', pad=0.02, shrink=0.8)
-    cbar.set_label(layer_name, fontsize=9)
+    # Remove all padding
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
     
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    
+    # Save main map
     img_buffer = BytesIO()
     plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, 
-                facecolor='none', edgecolor='none', transparent=True, pad_inches=0.1)
+                facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.read()).decode()
     plt.close()
     
+    # Create colorbar as separate image for legend
+    fig_cbar, ax_cbar = plt.subplots(figsize=(1, 4), dpi=100)
+    if norm_obj is not None:
+        cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_obj, cmap=cmap_obj), 
+                           cax=ax_cbar, orientation='vertical')
+    else:
+        norm_cont = Normalize(vmin=np.nanmin(raster_masked), vmax=np.nanmax(raster_masked))
+        cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_cont, cmap=cmap_obj), 
+                           cax=ax_cbar, orientation='vertical')
+    cbar.set_label(layer_name, fontsize=8)
+    
+    # Save colorbar
+    cbar_buffer = BytesIO()
+    plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=100,
+                facecolor='white', transparent=False, pad_inches=0.1)
+    cbar_buffer.seek(0)
+    cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
+    plt.close()
+    
+    # Create folium map
     m = folium.Map(
         location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
         zoom_start=10,
         tiles="OpenStreetMap"
     )
     
+    # Overlay main raster
     img_url = f"data:image/png;base64,{img_base64}"
     folium.raster_layers.ImageOverlay(
         image=img_url,
@@ -346,6 +369,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         cross_origin=False
     ).add_to(m)
     
+    # Get value at point
     try:
         selected_value = float(data_xr[layer_name].sel(latitude=lat, longitude=lon, method='nearest').values)
     except:
@@ -353,7 +377,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     
     folium.CircleMarker(
         location=[lat, lon],
-        radius=7,
+        radius=6,
         popup=f"<b>{layer_name}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value:.3f}",
         color='red',
         fill=True,
@@ -362,17 +386,16 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         weight=2
     ).add_to(m)
     
-    legend_html = f'<div style="position: fixed; top: 10px; right: 10px; width: 180px; background-color: white; border:2px solid grey; z-index:9999; font-size:10px; border-radius: 5px; padding: 8px"><b>{layer_name}</b><br>'
+    # Legend with colorbar inside
+    legend_html = f'''
+    <div style="position: fixed; top: 10px; right: 10px; width: 180px; 
+                background-color: white; border:2px solid grey; z-index:9999; 
+                border-radius: 5px; padding: 8px; text-align: center;">
+    <b style="font-size: 11px;">{layer_name}</b><br>
+    <img src="data:image/png;base64,{cbar_base64}" style="width: 100%; height: auto; margin-top: 5px;">
+    </div>
+    '''
     
-    if label_dict:
-        for i in sorted(label_dict.keys()):
-            legend_html += f'{label_dict[i]}<br>'
-    else:
-        vmin = np.nanmin(raster_masked)
-        vmax = np.nanmax(raster_masked)
-        legend_html += f'Range: {vmin:.2f} - {vmax:.2f}'
-    
-    legend_html += '</div>'
     m.get_root().html.add_child(folium.Element(legend_html))
     
     return m
