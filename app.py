@@ -123,6 +123,10 @@ DRIVER_MAP = {
 # PREDICTION LAYER TITLES & COLORMAPS (FROM NOTEBOOK)
 # ============================================================================
 
+# ============================================================================
+# PREDICTION LAYER TITLES & COLORMAPS (FROM NOTEBOOK - CORRECTED)
+# ============================================================================
+
 PREDICTION_TITLES = {
     'index_shap': "Specific Vulnerability",
     'index_shap_std': "Specific Vulnerability: Uncertainty",
@@ -134,7 +138,7 @@ PREDICTION_TITLES = {
     'y_hat_log_entropy_norm': "Defuzzified NO₃⁻ Contamination: Uncertainty",
 }
 
-# Colormaps (exact from notebook)
+# Continuous colormaps (exact from notebook)
 cmap_nitrate = mcolors.LinearSegmentedColormap.from_list(
     'nitrate_contamination',
     ['#FFEDA0', '#FED976', '#FEB24C', '#F03B20', '#BD0026']
@@ -155,7 +159,7 @@ cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
     ['#F0F9FF', '#B3E0F2', '#5AB4AC', '#1A7A7A', '#084B4B']
 )
 
-# 5-class categorical for predictions
+# 5-class categorical (same colors as continuous, but discrete)
 nitrate_5_colors = {
     1: '#FFEDA0',  # Very Low
     2: '#FED976',  # Low
@@ -171,6 +175,8 @@ vulnerability_5_colors = {
     4: '#FDE724',  # High - Yellow
     5: '#CC4C02',  # Very High - Dark orange
 }
+
+
 
 # ============================================================================
 # SIDEBAR: LOCATION INPUT
@@ -332,8 +338,11 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
 # ============================================================================
 # FUNCTION: Create prediction map with HORIZONTAL COLORBAR AT TOP
 # ============================================================================
+# ============================================================================
+# FUNCTION: Create prediction map with TINY HORIZONTAL COLORBAR
+# ============================================================================
 def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None, title=""):
-    """Create folium map for prediction layers with horizontal colorbar at top"""
+    """Create folium map for prediction layers with tiny horizontal colorbar"""
     
     try:
         raster_data = data_xr[layer_name].values
@@ -351,7 +360,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     
     raster_masked = np.ma.masked_where(water_mask, raster_data)
     
-    # Create main map figure (NO colorbar)
+    # Create main map figure
     fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
     fig.patch.set_alpha(0)
     
@@ -388,8 +397,8 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     img_base64 = base64.b64encode(img_buffer.read()).decode()
     plt.close()
     
-    # Create TINY horizontal colorbar for legend
-    fig_cbar, ax_cbar = plt.subplots(figsize=(2.5, 0.4), dpi=80)
+    # Create VERY SMALL horizontal colorbar
+    fig_cbar, ax_cbar = plt.subplots(figsize=(1.8, 0.25), dpi=80)
     if norm_obj is not None:
         cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_obj, cmap=cmap_obj), 
                            cax=ax_cbar, orientation='horizontal', pad=0.01)
@@ -399,11 +408,11 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         norm_cont = Normalize(vmin=vmin, vmax=vmax)
         cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_cont, cmap=cmap_obj), 
                            cax=ax_cbar, orientation='horizontal', pad=0.01)
-    cbar.ax.tick_params(labelsize=7)
+    cbar.ax.tick_params(labelsize=6)
     
     cbar_buffer = BytesIO()
     plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
-                facecolor='white', transparent=False, pad_inches=0.05)
+                facecolor='white', transparent=False, pad_inches=0.02)
     cbar_buffer.seek(0)
     cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
     plt.close()
@@ -442,13 +451,13 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         weight=2
     ).add_to(m)
     
-    # Legend with tiny horizontal colorbar at TOP CENTER
+    # Legend with TINY horizontal colorbar at TOP CENTER
     legend_html = f'''
     <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
                 background-color: white; border:1px solid grey; z-index:9999; 
-                border-radius: 3px; padding: 4px;">
-    <div style="font-size: 10px; font-weight: bold; text-align: center; margin-bottom: 3px;">{title}</div>
-    <img src="data:image/png;base64,{cbar_base64}" style="width: 200px; height: auto;">
+                border-radius: 2px; padding: 3px;">
+    <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 2px;">{title}</div>
+    <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto;">
     </div>
     '''
     
