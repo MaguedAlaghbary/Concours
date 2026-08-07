@@ -735,28 +735,58 @@ with tab_inputs:
                 im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
                               cmap=cat_cmap, norm=norm_cat, origin='lower', alpha=0.9,
                               interpolation='nearest')
-            else:
-                # Continuous colormap
-                vmin = config.get('vmin')
-                vmax = config.get('vmax')
+              else:
+                        # Continuous colormap
+                        vmin = config.get('vmin')
+                        vmax = config.get('vmax')
+                        
+                        # Calculate vmin/vmax from quantiles if not set
+                        if vmin is None or vmax is None:
+                            try:
+                                valid_data = layer_masked.compressed()  # Get non-masked values
+                                if len(valid_data) > 0:
+                                    if vmin is None and 'quantile_min' in config:
+                                        vmin = np.quantile(valid_data, config['quantile_min'])
+                                    if vmax is None and 'quantile_max' in config:
+                                        vmax = np.quantile(valid_data, config['quantile_max'])
+                                    # Fallback if still None
+                                    if vmin is None:
+                                        vmin = valid_data.min()
+                                    if vmax is None:
+                                        vmax = valid_data.max()
+                            except:
+                                vmin = vmin or 0
+                                vmax = vmax or 1
+                        
+                # Ensure vmin < vmax
+                if vmin is None or vmax is None or vmin >= vmax:
+                    valid_data = layer_masked.compressed()
+                    if len(valid_data) > 0:
+                        vmin = float(np.nanmin(valid_data))
+                        vmax = float(np.nanmax(valid_data))
+                    else:
+                        vmin = 0
+                        vmax = 1
                 
-                # Calculate vmin/vmax from quantiles if not set
-                if vmin is None or vmax is None:
-                    try:
-                        valid_data = layer_masked.compressed()  # Get non-masked values
-                        if len(valid_data) > 0:
-                            if vmin is None and 'quantile_min' in config:
-                                vmin = np.quantile(valid_data, config['quantile_min'])
-                            if vmax is None and 'quantile_max' in config:
-                                vmax = np.quantile(valid_data, config['quantile_max'])
-                            # Fallback if still None
-                            if vmin is None:
-                                vmin = valid_data.min()
-                            if vmax is None:
-                                vmax = valid_data.max()
-                    except:
-                        vmin = vmin or 0
-                        vmax = vmax or 1
+                # Add small buffer if vmin == vmax
+                if vmin == vmax:
+                    vmin = vmin - 0.5
+                    vmax = vmax + 0.5
+                
+                if config.get('log_scale'):
+                    from matplotlib.colors import LogNorm
+                    norm_cont = LogNorm(vmin=max(vmin, 0.01), vmax=vmax)
+                else:
+                    norm_cont = Normalize(vmin=vmin, vmax=vmax)
+                
+                try:
+                    im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+                                  cmap=config['cmap'], norm=norm_cont, origin='lower', alpha=0.9,
+                                  interpolation='nearest')
+                except Exception as e:
+                    st.warning(f"Could not render {config['layer']}: {str(e)}")
+                    plt.close()
+                    continue
                 
                 if config.get('log_scale'):
                     from matplotlib.colors import LogNorm
