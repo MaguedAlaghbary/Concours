@@ -900,7 +900,7 @@ with tab1:
 with tab2:
     st.header("🎯 Driver Attribution Analysis (Rank & SHAP)")
     
-    st.info("Top row: Driver Rank (1-4) | Bottom row: Driver SHAP values (1-4)")
+    st.info("Top: Driver Rank (1-4) | Bottom: Driver SHAP values (1-4)")
     
     # Get data
     try:
@@ -936,15 +936,20 @@ with tab2:
     driver_cmap = ListedColormap([driver_colors[k] for k in range(8)])
     norm_driver = BoundaryNorm(np.arange(-0.5, 8.5, 1), 8)
     
-    # ====== ROW 1: DRIVER RANK (1-4) ======
-    st.subheader("Driver Rank (Most Influential)")
-    cols_rank = st.columns(4)
+    # ====== SECTION 1: DRIVER RANK (1-4) ======
+    st.subheader("📊 Driver Rank (Most Influential)")
     
-    for rank in range(1, 5):
-        col = cols_rank[rank - 1]
-        
+    col_map1, col_map2, col_legend1 = st.columns([1, 1, 0.6])
+    
+    ranks_to_plot = [1, 2, 3, 4]
+    rank_positions = [
+        (col_map1, 1), (col_map2, 2),
+        (col_map1, 3), (col_map2, 4)
+    ]
+    
+    for rank, (col, pos) in zip(ranks_to_plot, rank_positions):
         with col:
-            st.text(f"Rank {rank}")
+            st.text(f"Rank {rank}", help=f"Driver ranking position {rank}")
             
             # Mask data
             driver_masked = np.ma.masked_where(water_mask, driver_rank_data[rank])
@@ -1016,17 +1021,45 @@ with tab2:
                 weight=2
             ).add_to(m)
             
-            st_folium(m, width=280, height=280, key=f"driver_rank_{rank}_{lat_input}_{lon_input}")
+            st_folium(m, width=300, height=300, key=f"driver_rank_{rank}_{lat_input}_{lon_input}")
     
-    # ====== ROW 2: DRIVER SHAP (1-4) ======
-    st.subheader("Driver SHAP Contribution (Top 4)")
-    cols_shap = st.columns(4)
-    
-    for shap_rank in range(1, 5):
-        col = cols_shap[shap_rank - 1]
+    with col_legend1:
+        st.subheader("🎨 Legend", help="Parameter colors")
+        param_list = [
+            ('D', 'Depth', 1),
+            ('R', 'Recharge', 2),
+            ('A', 'Aquifer', 3),
+            ('S', 'Soil', 4),
+            ('T', 'Topography', 5),
+            ('I', 'Impact', 6),
+            ('C', 'Conductivity', 7),
+            ('LU', 'Land Use', 8),
+        ]
         
+        for code, name, param_num in param_list:
+            color = parameters_8_colors[param_num]
+            st.markdown(
+                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 11px;">'
+                f'<b>{code}</b> {name}</div>',
+                unsafe_allow_html=True
+            )
+    
+    st.markdown("---")
+    
+    # ====== SECTION 2: DRIVER SHAP (1-4) ======
+    st.subheader("🔍 Driver SHAP Contribution (Top 4)")
+    
+    col_map3, col_map4, col_legend2 = st.columns([1, 1, 0.6])
+    
+    shap_ranks_to_plot = [1, 2, 3, 4]
+    shap_positions = [
+        (col_map3, 1), (col_map4, 2),
+        (col_map3, 3), (col_map4, 4)
+    ]
+    
+    for shap_rank, (col, pos) in zip(shap_ranks_to_plot, shap_positions):
         with col:
-            st.text(f"SHAP Rank {shap_rank}")
+            st.text(f"SHAP Rank {shap_rank}", help=f"SHAP contribution ranking {shap_rank}")
             
             # Mask data
             shap_masked = np.ma.masked_where(water_mask, driver_shap_data[shap_rank])
@@ -1098,29 +1131,26 @@ with tab2:
                 weight=2
             ).add_to(m)
             
-            st_folium(m, width=280, height=280, key=f"driver_shap_{shap_rank}_{lat_input}_{lon_input}")
+            st_folium(m, width=300, height=300, key=f"driver_shap_{shap_rank}_{lat_input}_{lon_input}")
     
-    # ====== LEGEND ======
-    st.markdown("---")
-    st.subheader("📋 Parameter Color Guide (Paul Tol Bright)")
-    
-    legend_cols = st.columns(4)
-    param_list = [
-        ('D', 'Depth to Water', 1),
-        ('R', 'Recharge', 2),
-        ('A', 'Aquifer Media', 3),
-        ('S', 'Soil Media', 4),
-        ('T', 'Topography', 5),
-        ('I', 'Impact Vadose', 6),
-        ('C', 'Conductivity', 7),
-        ('LU', 'Land Use', 8),
-    ]
-    
-    for idx, (code, name, param_num) in enumerate(param_list):
-        with legend_cols[idx % 4]:
+    with col_legend2:
+        st.subheader("🎨 Legend", help="Parameter colors")
+        param_list = [
+            ('D', 'Depth', 1),
+            ('R', 'Recharge', 2),
+            ('A', 'Aquifer', 3),
+            ('S', 'Soil', 4),
+            ('T', 'Topography', 5),
+            ('I', 'Impact', 6),
+            ('C', 'Conductivity', 7),
+            ('LU', 'Land Use', 8),
+        ]
+        
+        for code, name, param_num in param_list:
             color = parameters_8_colors[param_num]
             st.markdown(
-                f'<div style="padding: 8px; background-color: {color}; color: white; border-radius: 4px; text-align: center; font-weight: bold;">{code}<br><span style="font-size: 9px;">{name}</span></div>',
+                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 11px;">'
+                f'<b>{code}</b> {name}</div>',
                 unsafe_allow_html=True
             )
 # ============================================================================
