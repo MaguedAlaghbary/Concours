@@ -314,7 +314,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     # Add marker
     folium.CircleMarker(
         location=[lat, lon],
-        radius=6,
+        radius=4,
         popup=f"<b>{layer_name}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value}",
         color=marker_color,
         fill=True,
@@ -471,10 +471,11 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     '''
     
     # Add class labels if provided (only for categorical maps)
+    # Add class labels if provided (only for categorical maps - show names only)
     if class_labels:
-        legend_html += '<div style="font-size: 8px; border-top: 1px solid #ddd; padding-top: 4px; margin-top: 2px; line-height: 1.3;">'
+        legend_html += '<div style="font-size: 8px; border-top: 1px solid #ddd; padding-top: 4px; margin-top: 2px; line-height: 1.4;">'
         for class_num in sorted(class_labels.keys()):
-            legend_html += f'<div style="margin: 1px 0;"><span style="font-weight: bold;">{class_num}:</span> {class_labels[class_num]}</div>'
+            legend_html += f'<div style="margin: 1px 0;">{class_labels[class_num]}</div>'
         legend_html += '</div>'
     
     legend_html += '</div>'
@@ -626,7 +627,7 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        # index_shap_class: 1-5 (categorical, vulnerability, show labels)
+        # index_shap_class: 1-5 (SHOW CLASS NAMES ONLY)
         norm_class = BoundaryNorm(np.arange(0.5, 6.5, 1), 256)
         shap_class_map = create_prediction_map(lat_input, lon_input, data_xr,
                                               'index_shap_class', cmap_vulnerability, norm_class,
@@ -647,8 +648,8 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        # y_hat: 80-200 (continuous nitrate)
-        norm_yhat = Normalize(vmin=80, vmax=200)
+        # y_hat: 10-100 (continuous nitrate CONTAMINATION, NOT concentration)
+        norm_yhat = Normalize(vmin=10, vmax=100)
         y_hat_map = create_prediction_map(lat_input, lon_input, data_xr,
                                          'y_hat', cmap_nitrate, norm_yhat,
                                          title=PREDICTION_TITLES['y_hat'])
@@ -667,7 +668,7 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        # y_hat_log_class: 1-5 (categorical, nitrate, show labels)
+        # y_hat_log_class: 1-5 (SHOW CLASS NAMES ONLY)
         norm_yhat_class = BoundaryNorm(np.arange(0.5, 6.5, 1), 256)
         y_hat_class_map = create_prediction_map(lat_input, lon_input, data_xr,
                                                'y_hat_log_class', cmap_nitrate, norm_yhat_class,
