@@ -686,7 +686,10 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
 # ============================================================================
-# USAGE IN TAB: single big map with layer toggle
+# TAB 0: DRASTICLU INPUT LAYERS
+# ============================================================================
+# ============================================================================
+# TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
@@ -701,7 +704,7 @@ with tab_inputs:
         st.info(f"**{config['title']}** | {config['units']}")
     
     # Nitrate points toggle (only relevant for y_hat, but offered for convenience)
-    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
+    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle_inputs")
     
     if config['layer'] not in data_xr:
         st.error(f"❌ Layer {config['layer']} not found in data")
@@ -763,6 +766,7 @@ with tab_inputs:
         col_l, col_c, col_r = st.columns([1, 1.5, 1])
         with col_c:
             st_folium(m, width=600, height=500, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
+
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
 # ============================================================================
@@ -921,7 +925,7 @@ with tab1:
     st.header("Prediction Maps")
     
     # Toggle to show nitrate measurements
-    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
+    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle_predictions")
   
     col1, col2 = st.columns(2)
     
