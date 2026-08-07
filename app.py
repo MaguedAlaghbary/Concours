@@ -135,7 +135,7 @@ def extract_at_point(lat, lon, data_xr, vars_list):
     return results
 
 # ============================================================================
-# FUNCTION: Create map with raster overlay
+# FUNCTION: Create map with raster overlay (FIXED)
 # ============================================================================
 def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, norm, label_dict):
     """Create folium map with raster data overlay + selected point"""
@@ -168,10 +168,11 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
     # Add colorbar
     cbar = plt.colorbar(im, ax=ax, label=layer_name)
     
-    # Convert to PNG
+    # Convert to PNG + base64 (FIXED)
     img_buffer = BytesIO()
     plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100)
     img_buffer.seek(0)
+    img_base64 = base64.b64encode(img_buffer.read()).decode()  # ← Convert to base64
     plt.close()
     
     # Create folium map
@@ -181,9 +182,10 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
         tiles="OpenStreetMap"
     )
     
-    # Overlay raster image
+    # Overlay raster image as base64 string (FIXED)
+    img_url = f"data:image/png;base64,{img_base64}"
     folium.raster_layers.ImageOverlay(
-        image=img_buffer,
+        image=img_url,
         bounds=[[lat_min, lon_min], [lat_max, lon_max]],
         opacity=0.7,
         interactive=True,
