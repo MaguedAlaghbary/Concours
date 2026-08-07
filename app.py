@@ -900,18 +900,20 @@ with tab1:
 # ============================================================================
 # TAB 5: DRIVER SHAP ATTRIBUTION MAPS
 # ============================================================================
-with tab5:
-    st.header("🎯 SHAP Driver Attribution Maps (Top 4)")
+with tab2:
+    st.header("🎯 Driver Attribution Analysis (Rank & SHAP)")
     
-    st.info("Maps show which DRASTICLU parameter has highest SHAP values for ranks 1-4")
+    st.info("Top row: Driver Rank (1-4) | Bottom row: Driver SHAP values (1-4)")
     
-    # Get all 4 driver SHAP layers
+    # Get data
     try:
+        driver_rank_data = {}
         driver_shap_data = {}
         for i in range(1, 5):
+            driver_rank_data[i] = data_xr[f'driver_rank_{i}'].values
             driver_shap_data[i] = data_xr[f'driver_shap_{i}'].values
     except:
-        st.error("Cannot load driver SHAP data")
+        st.error("Cannot load driver data")
         st.stop()
     
     # Water mask
@@ -922,21 +924,36 @@ with tab5:
     lat_min, lat_max = lats.min(), lats.max()
     lon_min, lon_max = lons.min(), lons.max()
     
-    # Create 2x2 grid
-    cols = st.columns(2)
+    # Driver colors
+    driver_colors = {
+        0: parameters_8_colors[1],  # D
+        1: parameters_8_colors[2],  # R
+        2: parameters_8_colors[3],  # A
+        3: parameters_8_colors[4],  # S
+        4: parameters_8_colors[5],  # T
+        5: parameters_8_colors[6],  # I
+        6: parameters_8_colors[7],  # C
+        7: parameters_8_colors[8],  # LU
+    }
     
-    for shap_rank in range(1, 5):
-        col_idx = (shap_rank - 1) % 2
-        col = cols[col_idx]
+    driver_cmap = ListedColormap([driver_colors[k] for k in range(8)])
+    norm_driver = BoundaryNorm(np.arange(-0.5, 8.5, 1), 8)
+    
+    # ====== ROW 1: DRIVER RANK (1-4) ======
+    st.subheader("Driver Rank (Most Influential)")
+    cols_rank = st.columns(4)
+    
+    for rank in range(1, 5):
+        col = cols_rank[rank - 1]
         
         with col:
-            st.subheader(f"SHAP Rank {shap_rank}")
+            st.text(f"Rank {rank}")
             
-            # Get data
-            shap_masked = np.ma.masked_where(water_mask, driver_shap_data[shap_rank])
+            # Mask data
+            driver_masked = np.ma.masked_where(water_mask, driver_rank_data[rank])
             
             # Create figure
-            fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
+            fig, ax = plt.subplots(figsize=(7, 7), dpi=100, facecolor='none')
             fig.patch.set_alpha(0)
             
             ax.spines['top'].set_visible(False)
@@ -945,22 +962,7 @@ with tab5:
             ax.spines['left'].set_visible(False)
             ax.patch.set_alpha(0)
             
-            # Create colormap for drivers (0-7 = D, R, A, S, T, I, C, LU)
-            driver_colors = {
-                0: parameters_8_colors[1],  # D
-                1: parameters_8_colors[2],  # R
-                2: parameters_8_colors[3],  # A
-                3: parameters_8_colors[4],  # S
-                4: parameters_8_colors[5],  # T
-                5: parameters_8_colors[6],  # I
-                6: parameters_8_colors[7],  # C
-                7: parameters_8_colors[8],  # LU
-            }
-            
-            driver_cmap = ListedColormap([driver_colors[k] for k in range(8)])
-            norm_driver = BoundaryNorm(np.arange(-0.5, 8.5, 1), 8)
-            
-            im = ax.imshow(shap_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+            im = ax.imshow(driver_masked, extent=[lon_min, lon_max, lat_min, lat_max],
                           cmap=driver_cmap, norm=norm_driver, origin='lower', alpha=0.9,
                           interpolation='nearest')
             
@@ -977,19 +979,6 @@ with tab5:
                        facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
             img_buffer.seek(0)
             img_base64 = base64.b64encode(img_buffer.read()).decode()
-            plt.close()
-            
-            # Create horizontal colorbar
-            fig_cbar, ax_cbar = plt.subplots(figsize=(1.8, 0.25), dpi=80)
-            cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_driver, cmap=driver_cmap), 
-                               cax=ax_cbar, orientation='horizontal', pad=0.01)
-            cbar.ax.tick_params(labelsize=6)
-            
-            cbar_buffer = BytesIO()
-            plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
-                        facecolor='white', transparent=False, pad_inches=0.02)
-            cbar_buffer.seek(0)
-            cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
             plt.close()
             
             # Create folium map
@@ -1011,17 +1000,17 @@ with tab5:
             
             # Add marker
             try:
-                shap_idx = int(data_xr[f'driver_shap_{shap_rank}'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
-                driver_name = DRIVER_MAP.get(shap_idx, '?')
-                popup_text = f"SHAP Rank {shap_rank}: {driver_name}<br>{lat_input:.4f}°N, {lon_input:.4f}°E"
-                marker_color = driver_colors.get(shap_idx, '#CCCCCC')
+                driver_idx = int(data_xr[f'driver_rank_{rank}'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
+                driver_name = DRIVER_MAP.get(driver_idx, '?')
+                marker_color = driver_colors.get(driver_idx, '#CCCCCC')
+                popup_text = f"Rank {rank}: {driver_name}"
             except:
-                popup_text = f"SHAP Rank {shap_rank}"
                 marker_color = 'red'
+                popup_text = f"Rank {rank}"
             
             folium.CircleMarker(
                 location=[lat_input, lon_input],
-                radius=6,
+                radius=5,
                 popup=popup_text,
                 color=marker_color,
                 fill=True,
@@ -1030,21 +1019,91 @@ with tab5:
                 weight=2
             ).add_to(m)
             
-            # Legend
-            legend_html = f'''
-            <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
-                        background-color: white; border:1px solid grey; z-index:9999; 
-                        border-radius: 2px; padding: 3px;">
-            <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 2px;">SHAP Rank {shap_rank}</div>
-            <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto;">
-            </div>
-            '''
-            
-            m.get_root().html.add_child(folium.Element(legend_html))
-            
-            st_folium(m, width=380, height=380, key=f"driver_shap_{shap_rank}_{lat_input}_{lon_input}")
+            st_folium(m, width=280, height=280, key=f"driver_rank_{rank}_{lat_input}_{lon_input}")
     
-    # Legend panel
+    # ====== ROW 2: DRIVER SHAP (1-4) ======
+    st.subheader("Driver SHAP Contribution (Top 4)")
+    cols_shap = st.columns(4)
+    
+    for shap_rank in range(1, 5):
+        col = cols_shap[shap_rank - 1]
+        
+        with col:
+            st.text(f"SHAP Rank {shap_rank}")
+            
+            # Mask data
+            shap_masked = np.ma.masked_where(water_mask, driver_shap_data[shap_rank])
+            
+            # Create figure
+            fig, ax = plt.subplots(figsize=(7, 7), dpi=100, facecolor='none')
+            fig.patch.set_alpha(0)
+            
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.patch.set_alpha(0)
+            
+            im = ax.imshow(shap_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+                          cmap=driver_cmap, norm=norm_driver, origin='lower', alpha=0.9,
+                          interpolation='nearest')
+            
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_xlim([lon_min, lon_max])
+            ax.set_ylim([lat_min, lat_max])
+            
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
+            
+            # Save as PNG
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
+                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
+            img_buffer.seek(0)
+            img_base64 = base64.b64encode(img_buffer.read()).decode()
+            plt.close()
+            
+            # Create folium map
+            m = folium.Map(
+                location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
+                zoom_start=10,
+                tiles="OpenStreetMap"
+            )
+            
+            # Overlay
+            img_url = f"data:image/png;base64,{img_base64}"
+            folium.raster_layers.ImageOverlay(
+                image=img_url,
+                bounds=[[lat_min, lon_min], [lat_max, lon_map]],
+                opacity=0.85,
+                interactive=True,
+                cross_origin=False
+            ).add_to(m)
+            
+            # Add marker
+            try:
+                shap_idx = int(data_xr[f'driver_shap_{shap_rank}'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
+                driver_name = DRIVER_MAP.get(shap_idx, '?')
+                marker_color = driver_colors.get(shap_idx, '#CCCCCC')
+                popup_text = f"SHAP {shap_rank}: {driver_name}"
+            except:
+                marker_color = 'red'
+                popup_text = f"SHAP {shap_rank}"
+            
+            folium.CircleMarker(
+                location=[lat_input, lon_input],
+                radius=5,
+                popup=popup_text,
+                color=marker_color,
+                fill=True,
+                fillColor=marker_color,
+                fillOpacity=0.95,
+                weight=2
+            ).add_to(m)
+            
+            st_folium(m, width=280, height=280, key=f"driver_shap_{shap_rank}_{lat_input}_{lon_input}")
+    
+    # ====== LEGEND ======
     st.markdown("---")
     st.subheader("📋 Parameter Color Guide (Paul Tol Bright)")
     
