@@ -618,7 +618,10 @@ with tab3:
 # ============================================================================
 # TAB 4: PREDICTION MAPS
 # ============================================================================
-col1, col2 = st.columns(2)
+with tab4:
+    st.header("Prediction Maps")
+    
+    col1, col2 = st.columns(2)
     
     with col1:
         # index_shap_class: 1-5 (CATEGORICAL)
