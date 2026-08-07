@@ -242,7 +242,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
     # Add selected point (small marker)
     folium.CircleMarker(
         location=[lat, lon],
-        radius=8,
+        radius=4,
         popup=f"<b>{layer_name}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value}",
         color=marker_color,
         fill=True,
