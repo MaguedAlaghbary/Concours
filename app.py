@@ -708,7 +708,7 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
 with tab_inputs:
-    st.header("📥 DRASTICLU Input Layers (8 Parameters)")
+    #st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
     # Layer selector & toggle (full width, compact)
     col_s, col_c = st.columns([2, 1])
@@ -783,7 +783,7 @@ with tab_inputs:
     
     # Render map FULL-WIDTH as main figure
     if m:
-        st_folium(m, width=900, height=600, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
+        st_folium(m, width=1000, height=700, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
