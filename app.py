@@ -5,6 +5,7 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import colors as mcolors
 from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize
 from io import BytesIO
 import base64
