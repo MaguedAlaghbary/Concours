@@ -685,79 +685,15 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # ============================================================================
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
-'''
-with tab_inputs:
-    st.header("📥 DRASTICLU Input Layers (8 Parameters)")
-
-    # Create 4x2 grid
-    for idx, config in enumerate(INPUT_LAYERS_CONFIG):
-        if idx % 2 == 0:
-            col1, col2 = st.columns(2)
-
-        col = col1 if idx % 2 == 0 else col2
-
-        with col:
-            st.subheader(f"{config['title']} {config['units']}")
-
-            if config['layer'] not in data_xr:
-                st.error(f"❌ Layer {config['layer']} not found")
-                continue
-
-            water_mask = _get_water_mask(data_xr)
-
-            if config.get('categorical'):
-                # CLASS plotter: legend lists every category name present
-                m = plot_class_layer(
-                    data_xr, config['layer'],
-                    class_colors=config['colors'], class_labels=config['legend'],
-                    title=f"{config['title']} {config['units']}",
-                    lat=lat_input, lon=lon_input, water_mask=water_mask
-                )
-            else:
-                # CONTINUOUS plotter: legend is a colorbar scale.
-                # vmin/vmax resolution below is UNCHANGED from the original logic
-                # (explicit config value > quantile > data min/max, with the same
-                # vmin>=vmax and vmin==vmax safety nets).
-                layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
-                vmin, vmax = config.get('vmin'), config.get('vmax')
-
-                if vmin is None or vmax is None:
-                    valid_data = layer_masked.compressed()
-                    if len(valid_data) > 0:
-                        if vmin is None:
-                            vmin = np.quantile(valid_data, config['quantile_min']) if 'quantile_min' in config else float(valid_data.min())
-                        if vmax is None:
-                            vmax = np.quantile(valid_data, config['quantile_max']) if 'quantile_max' in config else float(valid_data.max())
-                    else:
-                        vmin, vmax = vmin or 0, vmax or 1
-
-                if vmin is None or vmax is None or vmin >= vmax:
-                    valid_data = layer_masked.compressed()
-                    if len(valid_data) > 0:
-                        vmin, vmax = float(np.nanmin(valid_data)), float(np.nanmax(valid_data))
-                    else:
-                        vmin, vmax = 0, 1
-
-                if vmin == vmax:
-                    vmin, vmax = vmin - 0.5, vmax + 0.5
-
-                norm_cont = (LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale')
-                             else Normalize(vmin=vmin, vmax=vmax))
-
-                m = plot_continuous_layer(
-                    data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
-                    title=f"{config['title']} {config['units']}", units=config['units'],
-                    lat=lat_input, lon=lon_input, water_mask=water_mask
-                )
-
-            if m:
-                st_folium(m, width=300, height=300, key=f"input_{config['layer']}_{lat_input}_{lon_input}")
-'''
 # ============================================================================
 # USAGE IN TAB: single big map with layer toggle
 # ============================================================================
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
+
+    # Toggle to show nitrate measurements
+    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
+  
     
     layer_names = [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
     selected_idx = st.selectbox("Choose a layer:", range(len(INPUT_LAYERS_CONFIG)), 
@@ -797,9 +733,11 @@ with tab_inputs:
             title=f"{config['title']} {config['units']}", units=config['units'],
             lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(10, 10)
         )
+    if y_hat_map and show_nitrate_points:
+        y_hat_map = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
     
     if m:
-        st_folium(m, width=900, height=700, key=f"layer_{config['layer']}")
+        st_folium(m, width=600, height=500, key=f"layer_{config['layer']}")
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
 # ============================================================================
