@@ -38,6 +38,58 @@ except FileNotFoundError:
 # DEFINE COLOR SCHEMES (EXACT from Douda notebook)
 # ============================================================================
 
+# ============================================================================
+# CATEGORY LABEL MAPS (For categorical input layers)
+# ============================================================================
+
+LITHOLOGY_NAME_MAP = {
+    0: "NoData",
+    1: "Dalha Basalts",
+    2: "Mablas Acidic Series",
+    3: "Stratoid Basalts",
+    4: "Quaternary Sediments",
+    5: "Water",
+    6: "Gulf Basalts",
+    7: "Axial Series",
+    8: "Ali Sabieh Basalts",
+    9: "Somali Basalts",
+    10: "Mesozoic Formation",
+    -1: "Merged"
+}
+
+SOIL_TEXTURE_MAPPING = {
+    0: "No Data",
+    1: "Clay",
+    2: "Silty Clay", 
+    3: "Sandy Clay",
+    4: "Clay Loam",
+    5: "Silty Clay Loam",
+    6: "Sandy Clay Loam",
+    7: "Loam",
+    8: "Silty Loam",
+    9: "Sandy Loam",
+    10: "Silt",
+    11: "Loamy Sand",
+    12: "Sand",
+    -1: "Merged"
+}
+
+LANDCOVER_LABEL_MAP = {
+    0: "NoData",
+    10: "Tree cover",
+    20: "Shrubland",
+    30: "Grassland",
+    40: "Cropland",
+    50: "Built-up",
+    60: "Bare",
+    70: "Snow/Ice",
+    80: "Water",
+    90: "Wetland",
+    95: "Mangroves",
+    100: "Moss/Lichen",
+    -1: "Merged"
+}
+
 # 9-level risk colormap - Blue-White-Red diverging
 risk_9_colors = {
     1: '#053061',  # Very Low - Dark blue
