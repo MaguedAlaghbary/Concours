@@ -783,7 +783,7 @@ with tab_inputs:
     
     # Render map FULL-WIDTH as main figure
     if m:
-        st_folium(m, width=1000, height=700, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
+        st_folium(m, width=900, height=600, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
