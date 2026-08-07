@@ -152,16 +152,7 @@ cmap_vulnerability = mcolors.LinearSegmentedColormap.from_list(
 # Use viridis for uncertainty (std dev)
 cmap_std = plt.cm.viridis
 
-# Use davos for entropy (from cmocean)
-try:
-    import cmocean.cm as cmo
-    cmap_entropy = cmo.davos
-except:
-    # Fallback if cmocean not installed
-    cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
-        'davos_fallback',
-        ['#F0F9FF', '#B3E0F2', '#5AB4AC', '#1A7A7A', '#084B4B']
-    )
+cmap_entropy = cmo.davos
 
 # 5-class categorical for defuzzified layers (with labels)
 vulnerability_class_labels = {
@@ -455,15 +446,23 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         weight=2
     ).add_to(m)
     
-    # Legend with tiny horizontal colorbar
-    legend_html = f'''
-    <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
-                background-color: white; border:1px solid grey; z-index:9999; 
-                border-radius: 2px; padding: 3px;">
-    <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 2px;">{title}</div>
-    <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto;">
-    </div>
-    '''
+    # Legend with tiny horizontal colorbar and class labels
+        legend_html = f'''
+        <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
+                    background-color: white; border:1px solid grey; z-index:9999; 
+                    border-radius: 2px; padding: 4px;">
+        <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 3px;">{title}</div>
+        <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto; margin-bottom: 3px;">
+        '''
+        
+        # Add class labels if provided
+        if class_labels:
+            legend_html += '<div style="font-size: 8px; border-top: 1px solid #ccc; padding-top: 3px;">'
+            for class_num in sorted(class_labels.keys()):
+                legend_html += f'<div>{class_num}: {class_labels[class_num]}</div>'
+            legend_html += '</div>'
+    
+    legend_html += '</div>'
     
     m.get_root().html.add_child(folium.Element(legend_html))
     
