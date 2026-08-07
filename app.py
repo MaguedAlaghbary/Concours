@@ -57,18 +57,31 @@ df_nitrate_points = load_nitrate_points()
 # FUNCTION TO ADD NITRATE POINTS TO FOLIUM MAP
 # ============================================================================
 def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
-    """Add nitrate measurement points as a folium FeatureGroup (toggleable)"""
-    if df_nitrate is None or not show_points:
+    """
+    Add nitrate measurement points to folium map with color-coding by concentration.
+    Handles flexible column names (no3, NO3, nitrate, concentration, etc.)
+    """
+    if df_nitrate is None or not show_points or df_nitrate.empty:
         return m
     
-    fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
+    # Identify column names (case-insensitive, handles variations)
+    col_names = {k.lower(): k for k in df_nitrate.columns}
     
-    # Get colormap RGBA values
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    no3_col = col_names.get('no3') or col_names.get('nitrate') or col_names.get('concentration')
+    
+    if not all([lat_col, lon_col, no3_col]):
+        return m  # Silently return if columns not found
+    
+    fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
+    count = 0
+    
     for idx, row in df_nitrate.iterrows():
         try:
-            lon = float(row['longitude'])
-            lat = float(row['latitude'])
-            no3_val = float(row['no3'])  # or 'NO3' or 'nitrate' depending on column name
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            no3_val = float(row[no3_col])
             
             # Normalize and get color
             normalized_val = norm_obj(no3_val)
@@ -82,8 +95,8 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
             # Add circle marker
             folium.CircleMarker(
                 location=[lat, lon],
-                radius=6,
-                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>Lat: {lat:.4f}°<br>Lon: {lon:.4f}°",
+                radius=5,
+                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
                 color=hex_color,
                 fill=True,
                 fillColor=hex_color,
@@ -91,10 +104,13 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
                 weight=1,
                 opacity=0.9
             ).add_to(fg_nitrate)
-        except (ValueError, KeyError) as e:
+            count += 1
+        except (ValueError, TypeError, KeyError):
             continue
     
-    fg_nitrate.add_to(m)
+    if count > 0:
+        fg_nitrate.add_to(m)
+    
     return m
 
 # ============================================================================
@@ -755,11 +771,14 @@ with tab_inputs:
             lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
         )
     
-    # Add nitrate measurement points ONLY if:
-    # (1) checkbox is checked, (2) we're viewing the y_hat (nitrate concentration) layer, (3) map rendered successfully
-    if show_nitrate_points and config['layer'] == 'y_hat' and m is not None and df_nitrate_points is not None:
-        norm_yhat = Normalize(vmin=10, vmax=100)
-        m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+    # Add nitrate measurement points overlay (on any DRASTICLU input layer)
+    if show_nitrate_points:
+        if df_nitrate_points is not None and not df_nitrate_points.empty:
+            norm_yhat = Normalize(vmin=10, vmax=100)
+            m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+            st.success(f"✓ Nitrate measurements overlaid on {config['layer'].upper()}", icon="🧪")
+        else:
+            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
     
     # Render map centered on page
     if m:
