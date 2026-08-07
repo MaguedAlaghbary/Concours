@@ -1275,7 +1275,7 @@ with tab1:
         y_hat_map = create_prediction_map(lat_input, lon_input, data_xr,
                                          'y_hat', cmap_nitrate, norm_yhat,
                                          title=PREDICTION_TITLES['y_hat'])
-       if y_hat_map and show_nitrate_points:
+        if y_hat_map and show_nitrate_points:
             y_hat_map = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
             
         if y_hat_map:
