@@ -151,7 +151,7 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm
         color_dict = risk_9_colors
     else:  # Priority
         raster_data = data_xr['priority_zones_regulatory'].values
-        color_dict = priority_4_colors
+        color_dict = risk_4_colors
     
     # Get water mask from LU layer (80 = water)
     lu_data = data_xr['LU'].values
