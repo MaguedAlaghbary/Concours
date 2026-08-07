@@ -151,14 +151,17 @@ cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
 )
 
 # Use davos for entropy (from cmocean)
+# ============================================================================
+# ENTROPY COLORMAP (DAVOS or fallback - LIGHT SEQUENTIAL)
+# ============================================================================
 try:
     import cmocean.cm as cmo
     cmap_entropy = cmo.davos
 except ImportError:
-    # Fallback: teal colormap (davos-inspired)
+    # Fallback: light blue-cyan sequential (davos-inspired, lighter)
     cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
-        'davos',
-        ['#F0FFFF', '#A7D8DE', '#5A9FA5', '#2F5F66', '#0D2626']
+        'davos_light',
+        ['#F7FBFF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5']
     )
 
 # 5-class categorical for defuzzified layers (with labels)
@@ -203,6 +206,117 @@ nitrate_5_colors = {
     4: '#F03B20',  # High - Red-orange
     5: '#BD0026',  # Very High - Dark red
 }
+
+# ============================================================================
+# PARAMETER COLORS - Paul Tol's "Bright" scheme (8 DRASTICLU parameters)
+# ============================================================================
+parameters_8_colors = {
+    1: '#4477AA',  # Blue - D (Depth to water)
+    2: '#EE6677',  # Red - R (Recharge)
+    3: '#228833',  # Green - A (Aquifer media)
+    4: '#CCBB44',  # Yellow - S (Soil media)
+    5: '#B2DF8A',  # Light green - T (Topography)
+    6: '#AA3377',  # Purple - I (Impact of vadose)
+    7: '#BBBBBB',  # Grey - C (Conductivity)
+    8: '#EE99AA',  # Pink - LU (Land use)
+}
+
+# Map driver indices to parameter codes
+DRIVER_PARAM_MAP = {
+    0: 'D',
+    1: 'R',
+    2: 'A',
+    3: 'S',
+    4: 'T',
+    5: 'I',
+    6: 'C',
+    7: 'LU'
+}
+
+
+# ============================================================================
+# INPUT LAYERS CONFIGURATION (DRASTICLU)
+# ============================================================================
+
+INPUT_LAYERS_CONFIG = [
+    {
+        "layer": "D",
+        "title": "Depth to Water Table",
+        "units": "[m]",
+        "cmap": "viridis",
+        "vmin": None,  # Will calculate from data
+        "vmax": None,
+        "quantile_min": 0.05,
+        "quantile_max": 0.95
+    },
+    {
+        "layer": "R",
+        "title": "Recharge",
+        "units": "[mm yr⁻¹]",
+        "cmap": "YlGn",
+        "vmin": 10,
+        "vmax": None,
+        "quantile_max": 0.75
+    },
+    {
+        "layer": "A",
+        "title": "Aquifer Media",
+        "units": "[Lithology]",
+        "categorical": True,
+        "legend": LITHOLOGY_NAME_MAP,
+        "colors": {0: "#a6cee3", 1: "#1f78b4", 2: "#b2df8a", 3: "#33a02c",
+                   4: "#fb9a99", 5: "#e31a1c", 6: "#fdbf6f", 7: "#ff7f00",
+                   8: "#cab2d6", 9: "#6a3d9a", 10: "#b15928"}
+    },
+    {
+        "layer": "S",
+        "title": "Soil Media",
+        "units": "[Soil Texture]",
+        "categorical": True,
+        "legend": SOIL_TEXTURE_MAPPING,
+        "colors": {0: "#66c2a5", 1: "#fc8d62", 2: "#a6d854", 3: "#8da0cb",
+                   4: "#e78ac3", 5: "#d9d9d9", 6: "#ffd92f", 7: "#e5c494",
+                   8: "#b3b3b3", 9: "#bc80bd", 10: "#fbbf9b", 11: "#cad5d0", 12: "#f4a582"}
+    },
+    {
+        "layer": "T",
+        "title": "Topography",
+        "units": "[%]",
+        "cmap": "cividis",
+        "vmin": 3,
+        "vmax": None,
+        "quantile_max": 0.95
+    },
+    {
+        "layer": "I",
+        "title": "Impact of Vadose Zone",
+        "units": "[d⁻¹]",
+        "cmap": "RdYlGn",
+        "vmin": None,
+        "vmax": None,
+        "quantile_min": 0.05,
+        "quantile_max": 0.95
+    },
+    {
+        "layer": "C",
+        "title": "Hydraulic Conductivity",
+        "units": "[m d⁻¹]",
+        "cmap": "magma",
+        "vmin": 0.05,
+        "vmax": 95,
+        "log_scale": True
+    },
+    {
+        "layer": "LU",
+        "title": "Land Use",
+        "units": "[Land Cover]",
+        "categorical": True,
+        "legend": LANDCOVER_LABEL_MAP,
+        "colors": {10: "#66c2a5", 20: "#a6d854", 30: "#ffd92f", 40: "#e78ac3",
+                   50: "#fc8d62", 60: "#8da0cb", 70: "#e5c494", 80: "#b3b3b3",
+                   90: "#ffffbf", 95: "#1b9e77", 100: "#d95f02", -1: "#cccccc"}
+    }
+]
 
 # ============================================================================
 # SIDEBAR: LOCATION INPUT
@@ -506,14 +620,132 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
 # TAB STRUCTURE
 # ============================================================================
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab_inputs, tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📥 DRASTICLU Inputs",
     "🗺️ Risk & Priority",
-    "🎯 Feature Importance", 
+    "🎯 Attributions", 
     "📊 Predictions",
     "📈 Prediction Maps",
     "📋 Data Table"
 ])
 
+# ============================================================================
+# TAB 0: DRASTICLU INPUT LAYERS
+# ============================================================================
+with tab_inputs:
+    st.header("📥 DRASTICLU Input Layers (8 Parameters)")
+    
+    # Create 4x2 grid
+    for idx, config in enumerate(INPUT_LAYERS_CONFIG):
+        if idx % 2 == 0:
+            col1, col2 = st.columns(2)
+        
+        col = col1 if idx % 2 == 0 else col2
+        
+        with col:
+            st.subheader(f"{config['title']} {config['units']}")
+            
+            # Get data
+            try:
+                layer_data = data_xr[config['layer']].values
+            except:
+                st.error(f"❌ Layer {config['layer']} not found")
+                continue
+            
+            # Mask water
+            lu_data = data_xr['LU'].values
+            water_mask = (lu_data == 80)
+            layer_masked = np.ma.masked_where(water_mask, layer_data)
+            
+            lats = data_xr['latitude'].values
+            lons = data_xr['longitude'].values
+            lat_min, lat_max = lats.min(), lats.max()
+            lon_min, lon_max = lons.min(), lons.max()
+            
+            # Create figure
+            fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
+            fig.patch.set_alpha(0)
+            
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.patch.set_alpha(0)
+            
+            # Plot continuous or categorical
+            if config.get('categorical'):
+                # Categorical colormap
+                cat_cmap = ListedColormap([config['colors'].get(k, '#cccccc') for k in sorted(config['colors'].keys())])
+                norm_cat = BoundaryNorm(np.arange(-0.5, len(config['colors'])+0.5, 1), cat_cmap.N)
+                im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+                              cmap=cat_cmap, norm=norm_cat, origin='lower', alpha=0.9,
+                              interpolation='nearest')
+            else:
+                # Continuous colormap
+                vmin = config.get('vmin')
+                vmax = config.get('vmax')
+                
+                if vmin is None and 'quantile_min' in config:
+                    vmin = np.nanquantile(layer_masked, config['quantile_min'])
+                if vmax is None and 'quantile_max' in config:
+                    vmax = np.nanquantile(layer_masked, config['quantile_max'])
+                
+                if config.get('log_scale'):
+                    from matplotlib.colors import LogNorm
+                    norm_cont = LogNorm(vmin=vmin, vmax=vmax)
+                else:
+                    norm_cont = Normalize(vmin=vmin, vmax=vmax)
+                
+                im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+                              cmap=config['cmap'], norm=norm_cont, origin='lower', alpha=0.9,
+                              interpolation='nearest')
+            
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_xlim([lon_min, lon_max])
+            ax.set_ylim([lat_min, lat_max])
+            
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
+            
+            # Save as PNG
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
+                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
+            img_buffer.seek(0)
+            img_base64 = base64.b64encode(img_buffer.read()).decode()
+            plt.close()
+            
+            # Create folium map
+            m = folium.Map(
+                location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
+                zoom_start=10,
+                tiles="OpenStreetMap"
+            )
+            
+            # Overlay
+            img_url = f"data:image/png;base64,{img_base64}"
+            folium.raster_layers.ImageOverlay(
+                image=img_url,
+                bounds=[[lat_min, lon_min], [lat_max, lon_max]],
+                opacity=0.85,
+                interactive=True,
+                cross_origin=False
+            ).add_to(m)
+            
+            # Add marker
+            folium.CircleMarker(
+                location=[lat_input, lon_input],
+                radius=6,
+                popup=f"{config['title']}<br>{lat_input:.4f}°N, {lon_input:.4f}°E",
+                color='red',
+                fill=True,
+                fillColor='red',
+                fillOpacity=0.95,
+                weight=2
+            ).add_to(m)
+            
+            st_folium(m, width=300, height=300, key=f"input_{config['layer']}_{lat_input}_{lon_input}")
+            
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
 # ============================================================================
@@ -541,40 +773,93 @@ with tab1:
 # TAB 2: FEATURE IMPORTANCE
 # ============================================================================
 with tab2:
-    st.header("Feature Importance Analysis")
+    st.header("🎯 Attribution Analysis (Top 4 Drivers)")
     
     driver_ranks = extract_at_point(lat_input, lon_input, data_xr,
-                                    [f'driver_rank_{i}' for i in range(1, 7)])
+                                    [f'driver_rank_{i}' for i in range(1, 5)])
     driver_shap = extract_at_point(lat_input, lon_input, data_xr,
-                                   [f'driver_shap_{i}' for i in range(1, 7)])
+                                   [f'driver_shap_{i}' for i in range(1, 5)])
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Driver Ranks")
+        st.subheader("📊 Driver Ranks (SHAP-based)")
         rank_data = []
-        for i in range(1, 7):
+        for i in range(1, 5):
             rank_val = int(driver_ranks.get(f'driver_rank_{i}', np.nan))
             if not np.isnan(rank_val):
+                param_code = DRIVER_PARAM_MAP.get(rank_val, '?')
+                param_name = DRASTIC_LABELS.get(param_code, f'Feature {rank_val}')
+                color = parameters_8_colors.get(rank_val + 1, '#CCCCCC')
                 rank_data.append({
                     'Rank': i,
-                    'Feature': DRIVER_MAP.get(rank_val, f'Feature {rank_val}')
+                    'Parameter': param_code,
+                    'Name': param_name
                 })
+        
         if rank_data:
-            st.dataframe(pd.DataFrame(rank_data), use_container_width=True, hide_index=True)
+            rank_df = pd.DataFrame(rank_data)
+            # Display with colored HTML
+            html_table = '<div style="font-size: 11px;">'
+            for idx, row in rank_df.iterrows():
+                param_idx = [k for k, v in DRIVER_PARAM_MAP.items() if v == row['Parameter']][0]
+                color = parameters_8_colors.get(param_idx + 1, '#CCCCCC')
+                html_table += f'<div style="margin: 5px 0; padding: 5px; background-color: {color}22; border-left: 4px solid {color};">'
+                html_table += f'<b>Rank {row["Rank"]}: {row["Parameter"]}</b> - {row["Name"]}'
+                html_table += '</div>'
+            html_table += '</div>'
+            st.markdown(html_table, unsafe_allow_html=True)
     
     with col2:
-        st.subheader("SHAP Rankings")
+        st.subheader("🔍 SHAP Attribution Values")
         shap_data = []
-        for i in range(1, 7):
+        for i in range(1, 5):
             shap_val = driver_shap.get(f'driver_shap_{i}', np.nan)
             if not np.isnan(shap_val):
+                param_idx = int(shap_val)
+                param_code = DRIVER_PARAM_MAP.get(param_idx, '?')
+                param_name = DRASTIC_LABELS.get(param_code, f'Feature {param_idx}')
+                color = parameters_8_colors.get(param_idx + 1, '#CCCCCC')
                 shap_data.append({
                     'Rank': i,
-                    'Feature': DRIVER_MAP.get(int(shap_val), f'Feature {int(shap_val)}')
+                    'Parameter': param_code,
+                    'Name': param_name
                 })
+        
         if shap_data:
-            st.dataframe(pd.DataFrame(shap_data), use_container_width=True, hide_index=True)
+            shap_df = pd.DataFrame(shap_data)
+            # Display with colored HTML
+            html_table = '<div style="font-size: 11px;">'
+            for idx, row in shap_df.iterrows():
+                param_idx = [k for k, v in DRIVER_PARAM_MAP.items() if v == row['Parameter']][0]
+                color = parameters_8_colors.get(param_idx + 1, '#CCCCCC')
+                html_table += f'<div style="margin: 5px 0; padding: 5px; background-color: {color}22; border-left: 4px solid {color};">'
+                html_table += f'<b>Rank {row["Rank"]}: {row["Parameter"]}</b> - {row["Name"]}'
+                html_table += '</div>'
+            html_table += '</div>'
+            st.markdown(html_table, unsafe_allow_html=True)
+    
+    # Color legend
+    st.subheader("📋 Parameter Color Guide (Paul Tol Bright)")
+    legend_cols = st.columns(4)
+    param_list = [
+        ('D', 'Depth to Water', 1),
+        ('R', 'Recharge', 2),
+        ('A', 'Aquifer Media', 3),
+        ('S', 'Soil Media', 4),
+        ('T', 'Topography', 5),
+        ('I', 'Impact Vadose', 6),
+        ('C', 'Conductivity', 7),
+        ('LU', 'Land Use', 8),
+    ]
+    
+    for idx, (code, name, param_num) in enumerate(param_list):
+        with legend_cols[idx % 4]:
+            color = parameters_8_colors[param_num]
+            st.markdown(
+                f'<div style="padding: 8px; background-color: {color}; color: white; border-radius: 4px; text-align: center; font-weight: bold;">{code}<br><span style="font-size: 10px;">{name}</span></div>',
+                unsafe_allow_html=True
+            )
 
 # ============================================================================
 # TAB 3: PREDICTIONS (Data)
