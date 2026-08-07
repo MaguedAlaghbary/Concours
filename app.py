@@ -735,28 +735,28 @@ with tab_inputs:
                 im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
                               cmap=cat_cmap, norm=norm_cat, origin='lower', alpha=0.9,
                               interpolation='nearest')
-              else:
-                        # Continuous colormap
-                        vmin = config.get('vmin')
-                        vmax = config.get('vmax')
-                        
-                        # Calculate vmin/vmax from quantiles if not set
-                        if vmin is None or vmax is None:
-                            try:
-                                valid_data = layer_masked.compressed()  # Get non-masked values
-                                if len(valid_data) > 0:
-                                    if vmin is None and 'quantile_min' in config:
-                                        vmin = np.quantile(valid_data, config['quantile_min'])
-                                    if vmax is None and 'quantile_max' in config:
-                                        vmax = np.quantile(valid_data, config['quantile_max'])
-                                    # Fallback if still None
-                                    if vmin is None:
-                                        vmin = valid_data.min()
-                                    if vmax is None:
-                                        vmax = valid_data.max()
-                            except:
-                                vmin = vmin or 0
-                                vmax = vmax or 1
+            else:
+                # Continuous colormap
+                vmin = config.get('vmin')
+                vmax = config.get('vmax')
+                
+                # Calculate vmin/vmax from quantiles if not set
+                if vmin is None or vmax is None:
+                    try:
+                        valid_data = layer_masked.compressed()  # Get non-masked values
+                        if len(valid_data) > 0:
+                            if vmin is None and 'quantile_min' in config:
+                                vmin = np.quantile(valid_data, config['quantile_min'])
+                            if vmax is None and 'quantile_max' in config:
+                                vmax = np.quantile(valid_data, config['quantile_max'])
+                            # Fallback if still None
+                            if vmin is None:
+                                vmin = valid_data.min()
+                            if vmax is None:
+                                vmax = valid_data.max()
+                    except:
+                        vmin = vmin or 0
+                        vmax = vmax or 1
                         
                 # Ensure vmin < vmax
                 if vmin is None or vmax is None or vmin >= vmax:
