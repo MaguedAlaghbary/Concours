@@ -72,11 +72,11 @@ shap_class_colors = {
 # Create colormaps (EXACT from notebook)
 risk_ids = sorted(risk_9_colors.keys())
 cmap_risk = ListedColormap([risk_9_colors[k] for k in risk_ids])
-norm_risk = BoundaryNorm(np.arange(0.5, 9.5, 1), cmap_risk.N)
+norm_risk = BoundaryNorm(np.arange(0.5, 10.5, 1), cmap_risk.N)
 
 priority_ids = sorted(priority_4_colors.keys())
 cmap_priority = ListedColormap([priority_4_colors[k] for k in priority_ids])
-norm_priority = BoundaryNorm(np.arange(0.5, 5.5, 1), cmap_priority.N)
+norm_priority = BoundaryNorm(np.arange(0.5, 6.5, 1), cmap_priority.N)
 
 # ============================================================================
 # LABELS
@@ -646,7 +646,7 @@ with tab4:
     with col1:
         # index_shap_class: 1-5 (CATEGORICAL)
         vuln_class_cmap = ListedColormap([vulnerability_5_colors[k] for k in sorted(vulnerability_5_colors.keys())])
-        norm_shap_class = BoundaryNorm(np.arange(0.5, 5.5, 1), vuln_class_cmap.N)
+        norm_shap_class = BoundaryNorm(np.arange(0.5, 6.5, 1), vuln_class_cmap.N)
         shap_class_map = create_map_with_raster_overlay(
             lat_input, lon_input, data_xr,
             "Defuzzified Specific Vulnerability", vuln_class_cmap, norm_shap_class, 
@@ -688,7 +688,7 @@ with tab4:
     with col1:
         # y_hat_log_class: 1-5 (CATEGORICAL)
         nitrate_class_cmap = ListedColormap([nitrate_5_colors[k] for k in sorted(nitrate_5_colors.keys())])
-        norm_yhat_class = BoundaryNorm(np.arange(0.5, 5.5, 1), nitrate_class_cmap.N)
+        norm_yhat_class = BoundaryNorm(np.arange(0.5, 6.5, 1), nitrate_class_cmap.N)
         y_hat_class_map = create_map_with_raster_overlay(
             lat_input, lon_input, data_xr,
             "Defuzzified NO₃⁻ Contamination", nitrate_class_cmap, norm_yhat_class, 
