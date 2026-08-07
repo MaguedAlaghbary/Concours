@@ -519,7 +519,7 @@ def _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64,
     """Folium map + raster ImageOverlay + a CircleMarker at the queried point."""
     m = folium.Map(
         location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-        zoom_start=10,
+        zoom_start=12,
         tiles="OpenStreetMap"
     )
     folium.raster_layers.ImageOverlay(
