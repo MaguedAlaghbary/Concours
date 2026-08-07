@@ -476,6 +476,8 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         for class_num in sorted(class_labels.keys()):
             legend_html += f'<div style="margin: 1px 0;"><span style="font-weight: bold;">{class_num}:</span> {class_labels[class_num]}</div>'
         legend_html += '</div>'
+    
+    legend_html += '</div>'
 
     
     m.get_root().html.add_child(folium.Element(legend_html))
