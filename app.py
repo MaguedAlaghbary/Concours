@@ -7,6 +7,10 @@ import numpy as np
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import os
 import pickle
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+
 
 st.set_page_config(page_title="Djibouti Aquifer Vulnerability", layout="wide")
 st.title("🗺️ Djibouti Nitrate Vulnerability Mapper")
@@ -131,46 +135,91 @@ def extract_at_point(lat, lon, data_xr, vars_list):
     return results
 
 # ============================================================================
-# FUNCTION: Create Folium map with legend
+# FUNCTION: Create map with raster overlay
 # ============================================================================
-def create_map_with_legend(lat, lon, layer_name, cmap_dict, label_dict):
-    """Create folium map with custom legend"""
+def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, norm, label_dict):
+    """Create folium map with raster data overlay + selected point"""
     
+    # Get data and coordinates
+    if layer_name == "Risk":
+        raster_data = data_xr['risk_pdp_shap'].values
+    else:  # Priority
+        raster_data = data_xr['priority_zones_regulatory'].values
+    
+    lats = data_xr['latitude'].values
+    lons = data_xr['longitude'].values
+    
+    # Get lat/lon bounds
+    lat_min, lat_max = lats.min(), lats.max()
+    lon_min, lon_max = lons.min(), lons.max()
+    
+    # Create matplotlib figure with colormap
+    fig, ax = plt.subplots(figsize=(10, 10), dpi=80)
+    
+    # Plot raster with colormap
+    im = ax.imshow(raster_data, extent=[lon_min, lon_max, lat_min, lat_max],
+                   cmap=cmap_dict, norm=norm, origin='lower', alpha=0.8)
+    
+    # Styling
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title(f"{layer_name} Map")
+    
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax, label=layer_name)
+    
+    # Convert to PNG
+    img_buffer = BytesIO()
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100)
+    img_buffer.seek(0)
+    plt.close()
+    
+    # Create folium map
     m = folium.Map(
-        location=[11.3, 42.9],
+        location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
         zoom_start=10,
         tiles="OpenStreetMap"
     )
     
-    # Add query point
+    # Overlay raster image
+    folium.raster_layers.ImageOverlay(
+        image=img_buffer,
+        bounds=[[lat_min, lon_min], [lat_max, lon_max]],
+        opacity=0.7,
+        interactive=True,
+        cross_origin=False
+    ).add_to(m)
+    
+    # Add selected point (red marker on top)
     folium.CircleMarker(
         location=[lat, lon],
-        radius=10,
+        radius=12,
         popup=f"{lat:.3f}°N, {lon:.3f}°E",
-        color='darkred',
+        color='red',
         fill=True,
-        fillColor='red',
-        fillOpacity=0.8,
+        fillColor='yellow',
+        fillOpacity=0.9,
         weight=3
     ).add_to(m)
     
     # Add legend
     legend_html = f'''
     <div style="position: fixed; 
-                bottom: 50px; right: 50px; width: 220px; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:12px;
+                bottom: 50px; right: 50px; width: 200px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:11px;
                 border-radius: 5px; padding: 10px">
-    <b>{layer_name}</b><br>
+    <b>{layer_name} Categories</b><br>
     '''
     
     for i in sorted(cmap_dict.keys()):
         label = label_dict.get(i, str(i))
-        legend_html += f'<i style="background:{cmap_dict[i]}; width: 18px; height: 18px; float: left; margin-right: 8px; border-radius: 2px;"></i>{label}<br>'
+        legend_html += f'<i style="background:{cmap_dict[i]}; width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px;"></i>{label}<br>'
     
     legend_html += '</div>'
     m.get_root().html.add_child(folium.Element(legend_html))
     
     return m
+
 
 # ============================================================================
 # MAIN DISPLAY: TAB INTERFACE
@@ -187,23 +236,25 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # TAB 1: RISK & PRIORITY MAPS
 # ============================================================================
 with tab1:
-    st.header("Risk & Management Priority Maps")
+    st.header("📊 Risk & Priority Maps with Full Overlay")
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("(a) Contamination Risk (1-9 levels)")
-        risk_map = create_map_with_legend(lat_input, lon_input, 
-                                         "Risk Categories", 
-                                         risk_9_colors, RISK_LABELS)
-        st_folium(risk_map, width=500, height=500, key="risk_map")
+        risk_map = create_map_with_raster_overlay(
+            lat_input, lon_input, data_xr,
+            "Risk", cmap_risk, norm_risk, RISK_LABELS
+        )
+        st_folium(risk_map, width=550, height=550, key="risk_map")
     
     with col2:
         st.subheader("(b) Management Priority (1-4 levels)")
-        priority_map = create_map_with_legend(lat_input, lon_input,
-                                             "Priority Zones",
-                                             priority_4_colors, PRIORITY_LABELS)
-        st_folium(priority_map, width=500, height=500, key="priority_map") 
+        priority_map = create_map_with_raster_overlay(
+            lat_input, lon_input, data_xr,
+            "Priority", cmap_priority, norm_priority, PRIORITY_LABELS
+        )
+        st_folium(priority_map, width=550, height=550, key="priority_map")
 
 # ============================================================================
 # TAB 2: FEATURE IMPORTANCE (Driver Ranks & SHAP)
