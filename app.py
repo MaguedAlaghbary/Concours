@@ -456,11 +456,11 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
         '''
         
         # Add class labels if provided
-        if class_labels:
-            legend_html += '<div style="font-size: 8px; border-top: 1px solid #ccc; padding-top: 3px;">'
-            for class_num in sorted(class_labels.keys()):
-                legend_html += f'<div>{class_num}: {class_labels[class_num]}</div>'
-            legend_html += '</div>'
+    if class_labels:
+        legend_html += '<div style="font-size: 8px; border-top: 1px solid #ccc; padding-top: 3px;">'
+        for class_num in sorted(class_labels.keys()):
+            legend_html += f'<div>{class_num}: {class_labels[class_num]}</div>'
+        legend_html += '</div>'
     
     legend_html += '</div>'
     
