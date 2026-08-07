@@ -733,8 +733,8 @@ with tab_inputs:
             title=f"{config['title']} {config['units']}", units=config['units'],
             lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(10, 10)
         )
-    if y_hat_map and show_nitrate_points:
-        y_hat_map = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
+    if  show_nitrate_points:
+        m = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
     
     if m:
         st_folium(m, width=600, height=500, key=f"layer_{config['layer']}")
