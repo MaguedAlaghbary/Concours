@@ -721,7 +721,7 @@ with tab_inputs:
         show_nitrate_points = st.checkbox("🧪 Nitrate Points", value=False, key="show_nitrate_toggle_inputs")
     
     # Info card
-    st.info(f"**{config['title']}** | {config['units']}")
+    #st.info(f"**{config['title']}** | {config['units']}")
     
     if config['layer'] not in data_xr:
         st.error(f"❌ Layer {config['layer']} not found in data")
@@ -783,7 +783,7 @@ with tab_inputs:
     
     # Render map FULL-WIDTH as main figure
     if m:
-        st_folium(m, width=1200, height=700, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
+        st_folium(m, width=900, height=600, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
