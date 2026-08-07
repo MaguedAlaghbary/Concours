@@ -690,54 +690,79 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # ============================================================================
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
-
-    # Toggle to show nitrate measurements
-    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
-  
     
-    layer_names = [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
-    selected_idx = st.selectbox("Choose a layer:", range(len(INPUT_LAYERS_CONFIG)), 
-                                  format_func=lambda i: layer_names[i])
-    config = INPUT_LAYERS_CONFIG[selected_idx]
-    st.info(f"**{config['title']}** | {config['units']}")
+    # Layer selector (centered)
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        layer_names = [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
+        selected_idx = st.selectbox("Choose a layer:", range(len(INPUT_LAYERS_CONFIG)), 
+                                      format_func=lambda i: layer_names[i], key="layer_select")
+        config = INPUT_LAYERS_CONFIG[selected_idx]
+        st.info(f"**{config['title']}** | {config['units']}")
+    
+    # Nitrate points toggle (only relevant for y_hat, but offered for convenience)
+    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
+    
+    if config['layer'] not in data_xr:
+        st.error(f"❌ Layer {config['layer']} not found in data")
+        st.stop()
     
     water_mask = _get_water_mask(data_xr)
     
+    # Render the chosen layer
     if config.get('categorical'):
-        # Categorical: use CLASS plotter
+        # CLASS plotter
         m = plot_class_layer(
             data_xr, config['layer'],
             class_colors=config['colors'], class_labels=config['legend'],
             title=f"{config['title']} {config['units']}",
-            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(10, 10)
+            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
         )
     else:
-        # Continuous: use CONTINUOUS plotter
+        # CONTINUOUS plotter: resolve vmin/vmax (same logic as before)
         layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
-        vmin = config.get('vmin')
-        vmax = config.get('vmax')
+        vmin, vmax = config.get('vmin'), config.get('vmax')
         
-        # Resolve vmin/vmax from quantiles if needed (preserves all original logic)
         if vmin is None or vmax is None:
             valid_data = layer_masked.compressed()
             if len(valid_data) > 0:
-                if vmin is None and 'quantile_min' in config:
-                    vmin = np.quantile(valid_data, config['quantile_min'])
-                if vmax is None and 'quantile_max' in config:
-                    vmax = np.quantile(valid_data, config['quantile_max'])
+                if vmin is None:
+                    vmin = np.quantile(valid_data, config['quantile_min']) if 'quantile_min' in config else float(valid_data.min())
+                if vmax is None:
+                    vmax = np.quantile(valid_data, config['quantile_max']) if 'quantile_max' in config else float(valid_data.max())
+            else:
+                vmin, vmax = vmin or 0, vmax or 1
         
-        norm_cont = LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale') else Normalize(vmin=vmin, vmax=vmax)
+        if vmin is None or vmax is None or vmin >= vmax:
+            valid_data = layer_masked.compressed()
+            if len(valid_data) > 0:
+                vmin, vmax = float(np.nanmin(valid_data)), float(np.nanmax(valid_data))
+            else:
+                vmin, vmax = 0, 1
+        
+        if vmin == vmax:
+            vmin, vmax = vmin - 0.5, vmax + 0.5
+        
+        norm_cont = (LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale')
+                     else Normalize(vmin=vmin, vmax=vmax))
         
         m = plot_continuous_layer(
             data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
             title=f"{config['title']} {config['units']}", units=config['units'],
-            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(10, 10)
+            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
         )
-    if  show_nitrate_points:
-        m = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
     
+    # Add nitrate measurement points ONLY if:
+    # (1) checkbox is checked, (2) we're viewing the y_hat (nitrate concentration) layer, (3) map rendered successfully
+    if show_nitrate_points and config['layer'] == 'y_hat' and m is not None and df_nitrate_points is not None:
+        norm_yhat = Normalize(vmin=10, vmax=100)
+        m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+    
+    # Render map centered on page
     if m:
-        st_folium(m, width=600, height=500, key=f"layer_{config['layer']}")
+        col_l, col_c, col_r = st.columns([1, 1.5, 1])
+        with col_c:
+            st_folium(m, width=600, height=500, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
 # ============================================================================
