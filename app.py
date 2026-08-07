@@ -710,17 +710,18 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
-    # Layer selector (centered)
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
+    # Layer selector & toggle (full width, compact)
+    col_s, col_c = st.columns([2, 1])
+    with col_s:
         layer_names = [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
         selected_idx = st.selectbox("Choose a layer:", range(len(INPUT_LAYERS_CONFIG)), 
                                       format_func=lambda i: layer_names[i], key="layer_select")
         config = INPUT_LAYERS_CONFIG[selected_idx]
-        st.info(f"**{config['title']}** | {config['units']}")
+    with col_c:
+        show_nitrate_points = st.checkbox("🧪 Nitrate Points", value=False, key="show_nitrate_toggle_inputs")
     
-    # Nitrate points toggle (only relevant for y_hat, but offered for convenience)
-    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle_inputs")
+    # Info card
+    st.info(f"**{config['title']}** | {config['units']}")
     
     if config['layer'] not in data_xr:
         st.error(f"❌ Layer {config['layer']} not found in data")
@@ -776,15 +777,13 @@ with tab_inputs:
         if df_nitrate_points is not None and not df_nitrate_points.empty:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
-            st.success(f"✓ Nitrate measurements overlaid on {config['layer'].upper()}", icon="🧪")
+            st.success(f"✓ Nitrate overlaid on {config['layer'].upper()}", icon="🧪")
         else:
-            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
+            st.warning("⚠️ Nitrate data not loaded", icon="🧪")
     
-    # Render map centered on page
+    # Render map FULL-WIDTH as main figure
     if m:
-        col_l, col_c, col_r = st.columns([1, 1.5, 1])
-        with col_c:
-            st_folium(m, width=600, height=500, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
+        st_folium(m, width=1200, height=700, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
