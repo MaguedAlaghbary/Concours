@@ -146,6 +146,10 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
     else:  # Priority
         raster_data = data_xr['priority_zones_regulatory'].values
     
+    # Get water mask from LU layer (80 = water)
+    lu_data = data_xr['LU'].values
+    water_mask = (lu_data == 80)  # True where water
+    
     lats = data_xr['latitude'].values
     lons = data_xr['longitude'].values
     
@@ -153,28 +157,32 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
     lat_min, lat_max = lats.min(), lats.max()
     lon_min, lon_max = lons.min(), lons.max()
     
-    # Create matplotlib figure with colormap
+    # Create matplotlib figure
     fig, ax = plt.subplots(figsize=(10, 10), dpi=80)
     
-    # Plot raster with colormap
+    # Mask water areas using LU layer
+    raster_masked = np.ma.masked_where(water_mask, raster_data)
+    
+    # Convert color dict to ListedColormap
     cmap_list = ListedColormap([cmap_dict[k] for k in sorted(cmap_dict.keys())])
-    im = ax.imshow(raster_data, extent=[lon_min, lon_max, lat_min, lat_max],
-               cmap=cmap_list, norm=norm, origin='lower', alpha=0.8)
-
+    cmap_list.set_bad(alpha=0)  # Make water (masked) areas transparent
     
-    # Styling
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
-    ax.set_title(f"{layer_name} Map")
+    # Plot raster with colormap
+    im = ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+                   cmap=cmap_list, norm=norm, origin='lower', alpha=0.9)
     
-    # Add colorbar
-    cbar = plt.colorbar(im, ax=ax, label=layer_name)
+    # Styling (clean)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.set_title("")
+    ax.set_xticks([])
+    ax.set_yticks([])
     
-    # Convert to PNG + base64 (FIXED)
+    # Convert to PNG + base64
     img_buffer = BytesIO()
-    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100)
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, pad_inches=0, facecolor='none')
     img_buffer.seek(0)
-    img_base64 = base64.b64encode(img_buffer.read()).decode()  # ← Convert to base64
+    img_base64 = base64.b64encode(img_buffer.read()).decode()
     plt.close()
     
     # Create folium map
@@ -184,17 +192,17 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
         tiles="OpenStreetMap"
     )
     
-    # Overlay raster image as base64 string (FIXED)
+    # Overlay raster image
     img_url = f"data:image/png;base64,{img_base64}"
     folium.raster_layers.ImageOverlay(
         image=img_url,
         bounds=[[lat_min, lon_min], [lat_max, lon_max]],
-        opacity=0.7,
+        opacity=0.8,
         interactive=True,
         cross_origin=False
     ).add_to(m)
     
-    # Add selected point (red marker on top)
+    # Add selected point
     folium.CircleMarker(
         location=[lat, lon],
         radius=12,
@@ -206,18 +214,18 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
         weight=3
     ).add_to(m)
     
-    # Add legend
+    # Add legend (TOP-RIGHT)
     legend_html = f'''
     <div style="position: fixed; 
-                bottom: 50px; right: 50px; width: 200px; 
+                top: 10px; right: 10px; width: 200px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:11px;
                 border-radius: 5px; padding: 10px">
-    <b>{layer_name} Categories</b><br>
+    <b>{layer_name}</b><br>
     '''
     
     for i in sorted(cmap_dict.keys()):
         label = label_dict.get(i, str(i))
-        legend_html += f'<i style="background:{cmap_dict[i]}; width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 2px;"></i>{label}<br>'
+        legend_html += f'<i style="background:{cmap_dict[i]}; width: 14px; height: 14px; float: left; margin-right: 6px; border-radius: 1px;"></i><span style="font-size:10px;">{label}</span><br>'
     
     legend_html += '</div>'
     m.get_root().html.add_child(folium.Element(legend_html))
