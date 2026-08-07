@@ -119,6 +119,59 @@ DRIVER_MAP = {
 }
 
 # ============================================================================
+# PREDICTION LAYER TITLES & COLORMAPS (FROM NOTEBOOK)
+# ============================================================================
+
+PREDICTION_TITLES = {
+    'index_shap': "Specific Vulnerability",
+    'index_shap_std': "Specific Vulnerability: Uncertainty",
+    'index_shap_class': "Defuzzified Specific Vulnerability",
+    'index_shap_entropy_norm': "Defuzzified Specific Vulnerability: Uncertainty",
+    'y_hat': "NO₃⁻ Concentrations",
+    'y_hat_std': "NO₃⁻ Concentrations: Uncertainty",
+    'y_hat_log_class': "Defuzzified NO₃⁻ Contamination",
+    'y_hat_log_entropy_norm': "Defuzzified NO₃⁻ Contamination: Uncertainty",
+}
+
+# Colormaps (exact from notebook)
+cmap_nitrate = mcolors.LinearSegmentedColormap.from_list(
+    'nitrate_contamination',
+    ['#FFEDA0', '#FED976', '#FEB24C', '#F03B20', '#BD0026']
+)
+
+cmap_vulnerability = mcolors.LinearSegmentedColormap.from_list(
+    'vulnerability_index',
+    ['#440154', '#31688E', '#35B779', '#FDE724', '#CC4C02']
+)
+
+cmap_std = mcolors.LinearSegmentedColormap.from_list(
+    'uncertainty_std',
+    ['#EFF3FF', '#BDD7E7', '#6BAED6', '#3182BD', '#08519C']
+)
+
+cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
+    'uncertainty_entropy',
+    ['#F0F9FF', '#B3E0F2', '#5AB4AC', '#1A7A7A', '#084B4B']
+)
+
+# 5-class categorical for predictions
+nitrate_5_colors = {
+    1: '#FFEDA0',  # Very Low
+    2: '#FED976',  # Low
+    3: '#FEB24C',  # Moderate
+    4: '#F03B20',  # High
+    5: '#BD0026',  # Very High
+}
+
+vulnerability_5_colors = {
+    1: '#440154',  # Very Low - Dark purple
+    2: '#31688E',  # Low - Blue
+    3: '#35B779',  # Moderate - Green
+    4: '#FDE724',  # High - Yellow
+    5: '#CC4C02',  # Very High - Dark orange
+}
+
+# ============================================================================
 # SIDEBAR: LOCATION INPUT
 # ============================================================================
 st.sidebar.header("📍 Query Location")
@@ -525,31 +578,33 @@ with tab4:
     
     with col1:
         shap_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                        'index_shap', 'RdBu_r', title="SHAP Index")
+                                        'index_shap', cmap_vulnerability, 
+                                        title=PREDICTION_TITLES['index_shap'])
         if shap_map:
             st_folium(shap_map, width=350, height=350, key=f"shap_index_map_{lat_input}_{lon_input}")
     
     with col2:
         shap_std_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                            'index_shap_std', 'Greys', title="SHAP Std Dev")
+                                            'index_shap_std', cmap_std, 
+                                            title=PREDICTION_TITLES['index_shap_std'])
         if shap_std_map:
             st_folium(shap_std_map, width=350, height=350, key=f"shap_std_map_{lat_input}_{lon_input}")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        shap_class_cmap = ListedColormap([shap_class_colors[k] for k in sorted(shap_class_colors.keys())])
-        shap_class_norm = BoundaryNorm(np.arange(0.5, 6.5, 1), len(shap_class_colors))
+        shap_class_cmap = ListedColormap([vulnerability_5_colors[k] for k in sorted(vulnerability_5_colors.keys())])
+        shap_class_norm = BoundaryNorm(np.arange(0.5, 6.5, 1), len(vulnerability_5_colors))
         shap_class_map = create_prediction_map(lat_input, lon_input, data_xr,
                                               'index_shap_class', shap_class_cmap, shap_class_norm, 
-                                              title="SHAP Class (1-5)")
+                                              title=PREDICTION_TITLES['index_shap_class'])
         if shap_class_map:
             st_folium(shap_class_map, width=350, height=350, key=f"shap_class_map_{lat_input}_{lon_input}")
     
     with col2:
         shap_entropy_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                                'index_shap_entropy_norm', 'YlGnBu', 
-                                                title="SHAP Entropy (Norm)")
+                                                'index_shap_entropy_norm', cmap_entropy, 
+                                                title=PREDICTION_TITLES['index_shap_entropy_norm'])
         if shap_entropy_map:
             st_folium(shap_entropy_map, width=350, height=350, key=f"shap_entropy_map_{lat_input}_{lon_input}")
     
@@ -557,31 +612,33 @@ with tab4:
     
     with col1:
         y_hat_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                         'y_hat', 'YlOrRd', title="Predicted Nitrate (mg/L)")
+                                         'y_hat', cmap_nitrate, 
+                                         title=PREDICTION_TITLES['y_hat'])
         if y_hat_map:
             st_folium(y_hat_map, width=350, height=350, key=f"y_hat_map_{lat_input}_{lon_input}")
     
     with col2:
         y_hat_std_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                             'y_hat_std', 'Greys', title="Y-Hat Std Dev")
+                                             'y_hat_std', cmap_std, 
+                                             title=PREDICTION_TITLES['y_hat_std'])
         if y_hat_std_map:
             st_folium(y_hat_std_map, width=350, height=350, key=f"y_hat_std_map_{lat_input}_{lon_input}")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        y_hat_class_cmap = ListedColormap([y_hat_class_colors[k] for k in sorted(y_hat_class_colors.keys())])
-        y_hat_class_norm = BoundaryNorm(np.arange(0.5, 6.5, 1), len(y_hat_class_colors))
+        y_hat_class_cmap = ListedColormap([nitrate_5_colors[k] for k in sorted(nitrate_5_colors.keys())])
+        y_hat_class_norm = BoundaryNorm(np.arange(0.5, 6.5, 1), len(nitrate_5_colors))
         y_hat_class_map = create_prediction_map(lat_input, lon_input, data_xr,
                                                'y_hat_log_class', y_hat_class_cmap, y_hat_class_norm,
-                                               title="Y-Hat Class (1-5)")
+                                               title=PREDICTION_TITLES['y_hat_log_class'])
         if y_hat_class_map:
             st_folium(y_hat_class_map, width=350, height=350, key=f"y_hat_class_map_{lat_input}_{lon_input}")
     
     with col2:
         y_hat_entropy_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                                 'y_hat_log_entropy_norm', 'YlGnBu',
-                                                 title="Y-Hat Entropy (Norm)")
+                                                 'y_hat_log_entropy_norm', cmap_entropy,
+                                                 title=PREDICTION_TITLES['y_hat_log_entropy_norm'])
         if y_hat_entropy_map:
             st_folium(y_hat_entropy_map, width=350, height=350, key=f"y_hat_entropy_map_{lat_input}_{lon_input}")
 
