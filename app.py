@@ -35,6 +35,69 @@ except FileNotFoundError:
     st.stop()
 
 # ============================================================================
+# LOAD NITRATE MEASUREMENT POINTS
+# ============================================================================
+@st.cache_data
+def load_nitrate_points():
+    try:
+        df_nitrate = pd.read_csv('lat_lon_d_n_data.csv')
+        # Ensure column names are correct
+        df_nitrate.columns = df_nitrate.columns.str.strip().str.lower()
+        return df_nitrate
+    except FileNotFoundError:
+        st.warning("⚠️ Nitrate measurements file not found: lat_lon_d_n_data.csv")
+        return None
+    except Exception as e:
+        st.warning(f"⚠️ Error loading nitrate data: {str(e)}")
+        return None
+
+df_nitrate_points = load_nitrate_points()
+
+# ============================================================================
+# FUNCTION TO ADD NITRATE POINTS TO FOLIUM MAP
+# ============================================================================
+def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
+    """Add nitrate measurement points as a folium FeatureGroup (toggleable)"""
+    if df_nitrate is None or not show_points:
+        return m
+    
+    fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
+    
+    # Get colormap RGBA values
+    for idx, row in df_nitrate.iterrows():
+        try:
+            lon = float(row['longitude'])
+            lat = float(row['latitude'])
+            no3_val = float(row['no3'])  # or 'NO3' or 'nitrate' depending on column name
+            
+            # Normalize and get color
+            normalized_val = norm_obj(no3_val)
+            rgba = cmap(normalized_val)
+            hex_color = '#{:02x}{:02x}{:02x}'.format(
+                int(rgba[0]*255), 
+                int(rgba[1]*255), 
+                int(rgba[2]*255)
+            )
+            
+            # Add circle marker
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>Lat: {lat:.4f}°<br>Lon: {lon:.4f}°",
+                color=hex_color,
+                fill=True,
+                fillColor=hex_color,
+                fillOpacity=0.8,
+                weight=1,
+                opacity=0.9
+            ).add_to(fg_nitrate)
+        except (ValueError, KeyError) as e:
+            continue
+    
+    fg_nitrate.add_to(m)
+    return m
+
+# ============================================================================
 # DEFINE COLOR SCHEMES (EXACT from Douda notebook)
 # ============================================================================
 
@@ -674,13 +737,11 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
 # TAB STRUCTURE
 # ============================================================================
 
-tab_inputs, tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab_inputs, tab1, tab2, tab3 = st.tabs([
     "📥 DRASTICLU Inputs",
+    "📈 Prediction Maps",
     "🗺️ Risk & Priority",
     "🎯 Attributions", 
-    "📊 Predictions",
-    "📈 Prediction Maps",
-    "📋 Data Table"
 ])
 
 # ============================================================================
@@ -874,7 +935,7 @@ with tab_inputs:
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
 # ============================================================================
-with tab1:
+with tab3:
     st.header("Risk & Priority Assessment")
     
     col1, col2 = st.columns(2)
@@ -1153,51 +1214,17 @@ with tab2:
                 f'<b>{code}</b> {name}</div>',
                 unsafe_allow_html=True
             )
-# ============================================================================
-# TAB 3: PREDICTIONS (Data)
-# ============================================================================
-with tab3:
-    st.header("Uncertainty-Quantified Predictions")
-    
-    preds = extract_at_point(lat_input, lon_input, data_xr,
-                            ['y_hat', 'y_hat_std', 'y_hat_log_class', 
-                             'y_hat_log_entropy_norm', 'index_shap', 'index_shap_std',
-                             'index_shap_class', 'index_shap_entropy_norm'])
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Predicted Nitrate (mg/L)", f"{preds.get('y_hat', np.nan):.2f}")
-    
-    with col2:
-        st.metric("Y-Hat Std Dev", f"{preds.get('y_hat_std', np.nan):.2f}")
-    
-    with col3:
-        st.metric("SHAP Index", f"{preds.get('index_shap', np.nan):.2f}")
-    
-    with col4:
-        st.metric("SHAP Std Dev", f"{preds.get('index_shap_std', np.nan):.2f}")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        y_class = int(preds.get('y_hat_log_class', np.nan)) if not np.isnan(preds.get('y_hat_log_class', np.nan)) else 0
-        st.metric("Y-Hat Class", y_class)
-    
-    with col2:
-        entropy = preds.get('y_hat_log_entropy_norm', np.nan)
-        st.metric("Y-Hat Entropy", f"{entropy:.3f}")
-    
-    with col3:
-        shap_class = int(preds.get('index_shap_class', np.nan)) if not np.isnan(preds.get('index_shap_class', np.nan)) else 0
-        st.metric("SHAP Class", shap_class)
+
 
 # ============================================================================
 # TAB 4: PREDICTION MAPS
 # ============================================================================
-with tab4:
+with tab1:
     st.header("Prediction Maps")
     
+    # Toggle to show nitrate measurements
+    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
+  
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1248,6 +1275,9 @@ with tab4:
         y_hat_map = create_prediction_map(lat_input, lon_input, data_xr,
                                          'y_hat', cmap_nitrate, norm_yhat,
                                          title=PREDICTION_TITLES['y_hat'])
+       if y_hat_map and show_nitrate_points:
+            y_hat_map = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
+            
         if y_hat_map:
             st_folium(y_hat_map, width=350, height=350, key=f"y_hat_map_{lat_input}_{lon_input}")
     
@@ -1281,37 +1311,7 @@ with tab4:
                                                  title=PREDICTION_TITLES['y_hat_log_entropy_norm'])
         if y_hat_entropy_map:
             st_folium(y_hat_entropy_map, width=350, height=350, key=f"y_hat_entropy_map_{lat_input}_{lon_input}")
-# ============================================================================
-# TAB 5: COMPLETE DATA TABLE
-# ============================================================================
-with tab5:
-    st.header("Complete Assessment Data")
-    
-    all_vars = list(DRASTIC_LABELS.keys()) + [
-        'driver_rank_1', 'driver_rank_2', 'driver_rank_3', 'driver_rank_4', 'driver_rank_5', 'driver_rank_6',
-        'driver_shap_1', 'driver_shap_2', 'driver_shap_3', 'driver_shap_4', 'driver_shap_5', 'driver_shap_6',
-        'risk_pdp_shap', 'priority_zones_regulatory',
-        'index_shap', 'index_shap_std', 'index_shap_class', 'index_shap_entropy_norm',
-        'y_hat', 'y_hat_std', 'y_hat_log_class', 'y_hat_log_entropy_norm'
-    ]
-    
-    data = extract_at_point(lat_input, lon_input, data_xr, all_vars)
-    
-    table_data = []
-    for var, val in data.items():
-        if not np.isnan(val):
-            table_data.append({'Variable': var, 'Value': f"{val:.4f}"})
-    
-    table_df = pd.DataFrame(table_data)
-    st.dataframe(table_df, use_container_width=True, hide_index=True)
-    
-    csv = table_df.to_csv(index=False)
-    st.download_button(
-        label="📥 Download CSV",
-        data=csv,
-        file_name=f"assessment_{lat_input:.3f}_{lon_input:.3f}.csv",
-        mime="text/csv"
-    )
+
 
 # ============================================================================
 # FOOTER
