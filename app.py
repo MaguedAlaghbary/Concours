@@ -686,6 +686,9 @@ tab_inputs, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # ============================================================================
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
+# ============================================================================
+# TAB 0: DRASTICLU INPUT LAYERS
+# ============================================================================
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
@@ -716,9 +719,11 @@ with tab_inputs:
             lat_min, lat_max = lats.min(), lats.max()
             lon_min, lon_max = lons.min(), lons.max()
             
-            # Create figure
-            fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
+            # Create figure with colorbar space
+            fig = plt.figure(figsize=(9, 9), dpi=100)
             fig.patch.set_alpha(0)
+            gs = fig.add_gridspec(1, 2, width_ratios=[20, 1])
+            ax = fig.add_subplot(gs[0])
             
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
@@ -727,14 +732,21 @@ with tab_inputs:
             ax.patch.set_alpha(0)
             
             # Plot continuous or categorical
-            # Plot continuous or categorical
             if config.get('categorical'):
                 # Categorical colormap
-                cat_cmap = ListedColormap([config['colors'].get(k, '#cccccc') for k in sorted(config['colors'].keys())])
-                norm_cat = BoundaryNorm(np.arange(-0.5, len(config['colors'])+0.5, 1), cat_cmap.N)
+                unique_vals = np.unique(layer_masked.compressed())
+                cat_colors = [config['colors'].get(int(v), '#cccccc') for v in sorted(unique_vals)]
+                cat_cmap = ListedColormap(cat_colors)
+                norm_cat = BoundaryNorm(np.arange(min(unique_vals)-0.5, max(unique_vals)+1.5, 1), cat_cmap.N)
                 im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
                               cmap=cat_cmap, norm=norm_cat, origin='lower', alpha=0.9,
                               interpolation='nearest')
+                
+                # Add categorical legend
+                cbar_ax = fig.add_subplot(gs[1])
+                cbar = plt.colorbar(im, cax=cbar_ax, orientation='vertical', pad=0.01)
+                cbar.ax.tick_params(labelsize=7)
+                
             else:
                 # Continuous colormap
                 vmin = config.get('vmin')
@@ -743,13 +755,12 @@ with tab_inputs:
                 # Calculate vmin/vmax from quantiles if not set
                 if vmin is None or vmax is None:
                     try:
-                        valid_data = layer_masked.compressed()  # Get non-masked values
+                        valid_data = layer_masked.compressed()
                         if len(valid_data) > 0:
                             if vmin is None and 'quantile_min' in config:
                                 vmin = np.quantile(valid_data, config['quantile_min'])
                             if vmax is None and 'quantile_max' in config:
                                 vmax = np.quantile(valid_data, config['quantile_max'])
-                            # Fallback if still None
                             if vmin is None:
                                 vmin = valid_data.min()
                             if vmax is None:
@@ -757,7 +768,7 @@ with tab_inputs:
                     except:
                         vmin = vmin or 0
                         vmax = vmax or 1
-                        
+                
                 # Ensure vmin < vmax
                 if vmin is None or vmax is None or vmin >= vmax:
                     valid_data = layer_masked.compressed()
@@ -768,7 +779,6 @@ with tab_inputs:
                         vmin = 0
                         vmax = 1
                 
-                # Add small buffer if vmin == vmax
                 if vmin == vmax:
                     vmin = vmin - 0.5
                     vmax = vmax + 0.5
@@ -779,36 +789,27 @@ with tab_inputs:
                 else:
                     norm_cont = Normalize(vmin=vmin, vmax=vmax)
                 
-                try:
-                    im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                                  cmap=config['cmap'], norm=norm_cont, origin='lower', alpha=0.9,
-                                  interpolation='nearest')
-                except Exception as e:
-                    st.warning(f"Could not render {config['layer']}: {str(e)}")
-                    plt.close()
-                    continue
-                
-                if config.get('log_scale'):
-                    from matplotlib.colors import LogNorm
-                    norm_cont = LogNorm(vmin=vmin, vmax=vmax)
-                else:
-                    norm_cont = Normalize(vmin=vmin, vmax=vmax)
-                
                 im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
                               cmap=config['cmap'], norm=norm_cont, origin='lower', alpha=0.9,
                               interpolation='nearest')
+                
+                # Add colorbar
+                cbar_ax = fig.add_subplot(gs[1])
+                cbar = plt.colorbar(im, cax=cbar_ax, orientation='vertical', pad=0.01)
+                cbar.set_label(config['units'], fontsize=9)
+                cbar.ax.tick_params(labelsize=7)
             
             ax.set_xticks([])
             ax.set_yticks([])
             ax.set_xlim([lon_min, lon_max])
             ax.set_ylim([lat_min, lat_max])
             
-            plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
+            plt.subplots_adjust(left=0, right=0.95, top=1, bottom=0, hspace=0, wspace=0.1)
             
             # Save as PNG
             img_buffer = BytesIO()
             plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
-                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
+                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0.01)
             img_buffer.seek(0)
             img_base64 = base64.b64encode(img_buffer.read()).decode()
             plt.close()
@@ -831,10 +832,16 @@ with tab_inputs:
             ).add_to(m)
             
             # Add marker
+            try:
+                point_value = float(data_xr[config['layer']].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
+                popup_text = f"{config['title']}<br>{lat_input:.4f}°N, {lon_input:.4f}°E<br>Value: {point_value:.2f}"
+            except:
+                popup_text = f"{config['title']}<br>{lat_input:.4f}°N, {lon_input:.4f}°E"
+            
             folium.CircleMarker(
                 location=[lat_input, lon_input],
                 radius=6,
-                popup=f"{config['title']}<br>{lat_input:.4f}°N, {lon_input:.4f}°E",
+                popup=popup_text,
                 color='red',
                 fill=True,
                 fillColor='red',
@@ -871,17 +878,28 @@ with tab1:
 # TAB 2: FEATURE IMPORTANCE
 # ============================================================================
 with tab2:
-    st.header("🎯 Attribution Analysis (Top 4 Drivers)")
+    st.header("🎯 Driver Attribution Maps (Top Influence)")
     
-    driver_ranks = extract_at_point(lat_input, lon_input, data_xr,
-                                    [f'driver_rank_{i}' for i in range(1, 5)])
-    driver_shap = extract_at_point(lat_input, lon_input, data_xr,
-                                   [f'driver_shap_{i}' for i in range(1, 5)])
+    # Get top driver at this location
+    try:
+        top_driver_rank = int(data_xr['driver_rank_1'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
+        top_driver_param = DRIVER_PARAM_MAP.get(top_driver_rank, '?')
+        top_driver_name = DRASTIC_LABELS.get(top_driver_param, 'Unknown')
+        top_driver_color = parameters_8_colors.get(top_driver_rank + 1, '#CCCCCC')
+    except:
+        top_driver_param = '?'
+        top_driver_name = 'Unknown'
+        top_driver_color = '#CCCCCC'
     
-    col1, col2 = st.columns(2)
+    st.info(f"🔴 **Top Driver at this location:** {top_driver_param} ({top_driver_name})")
+    
+    # Show ranking table
+    col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.subheader("📊 Driver Ranks (SHAP-based)")
+        st.subheader("Top 4 Drivers")
+        driver_ranks = extract_at_point(lat_input, lon_input, data_xr,
+                                        [f'driver_rank_{i}' for i in range(1, 5)])
         rank_data = []
         for i in range(1, 5):
             rank_val = int(driver_ranks.get(f'driver_rank_{i}', np.nan))
@@ -892,72 +910,39 @@ with tab2:
                 rank_data.append({
                     'Rank': i,
                     'Parameter': param_code,
-                    'Name': param_name
+                    'Name': param_name,
+                    'Color': color
                 })
         
         if rank_data:
-            rank_df = pd.DataFrame(rank_data)
-            # Display with colored HTML
-            html_table = '<div style="font-size: 11px;">'
-            for idx, row in rank_df.iterrows():
-                param_idx = [k for k, v in DRIVER_PARAM_MAP.items() if v == row['Parameter']][0]
-                color = parameters_8_colors.get(param_idx + 1, '#CCCCCC')
-                html_table += f'<div style="margin: 5px 0; padding: 5px; background-color: {color}22; border-left: 4px solid {color};">'
-                html_table += f'<b>Rank {row["Rank"]}: {row["Parameter"]}</b> - {row["Name"]}'
-                html_table += '</div>'
-            html_table += '</div>'
-            st.markdown(html_table, unsafe_allow_html=True)
+            for row in rank_data:
+                st.markdown(
+                    f'<div style="padding: 8px; background-color: {row["Color"]}22; border-left: 4px solid {row["Color"]}; margin: 5px 0;">'
+                    f'<b>#{row["Rank"]}: {row["Parameter"]}</b><br><span style="font-size: 10px;">{row["Name"]}</span></div>',
+                    unsafe_allow_html=True
+                )
     
     with col2:
-        st.subheader("🔍 SHAP Attribution Values")
-        shap_data = []
-        for i in range(1, 5):
-            shap_val = driver_shap.get(f'driver_shap_{i}', np.nan)
-            if not np.isnan(shap_val):
-                param_idx = int(shap_val)
-                param_code = DRIVER_PARAM_MAP.get(param_idx, '?')
-                param_name = DRASTIC_LABELS.get(param_code, f'Feature {param_idx}')
-                color = parameters_8_colors.get(param_idx + 1, '#CCCCCC')
-                shap_data.append({
-                    'Rank': i,
-                    'Parameter': param_code,
-                    'Name': param_name
-                })
+        st.subheader("Parameter Color Guide")
+        param_cols = st.columns(4)
+        param_list = [
+            ('D', 'Depth to Water', 1),
+            ('R', 'Recharge', 2),
+            ('A', 'Aquifer Media', 3),
+            ('S', 'Soil Media', 4),
+            ('T', 'Topography', 5),
+            ('I', 'Impact Vadose', 6),
+            ('C', 'Conductivity', 7),
+            ('LU', 'Land Use', 8),
+        ]
         
-        if shap_data:
-            shap_df = pd.DataFrame(shap_data)
-            # Display with colored HTML
-            html_table = '<div style="font-size: 11px;">'
-            for idx, row in shap_df.iterrows():
-                param_idx = [k for k, v in DRIVER_PARAM_MAP.items() if v == row['Parameter']][0]
-                color = parameters_8_colors.get(param_idx + 1, '#CCCCCC')
-                html_table += f'<div style="margin: 5px 0; padding: 5px; background-color: {color}22; border-left: 4px solid {color};">'
-                html_table += f'<b>Rank {row["Rank"]}: {row["Parameter"]}</b> - {row["Name"]}'
-                html_table += '</div>'
-            html_table += '</div>'
-            st.markdown(html_table, unsafe_allow_html=True)
-    
-    # Color legend
-    st.subheader("📋 Parameter Color Guide (Paul Tol Bright)")
-    legend_cols = st.columns(4)
-    param_list = [
-        ('D', 'Depth to Water', 1),
-        ('R', 'Recharge', 2),
-        ('A', 'Aquifer Media', 3),
-        ('S', 'Soil Media', 4),
-        ('T', 'Topography', 5),
-        ('I', 'Impact Vadose', 6),
-        ('C', 'Conductivity', 7),
-        ('LU', 'Land Use', 8),
-    ]
-    
-    for idx, (code, name, param_num) in enumerate(param_list):
-        with legend_cols[idx % 4]:
-            color = parameters_8_colors[param_num]
-            st.markdown(
-                f'<div style="padding: 8px; background-color: {color}; color: white; border-radius: 4px; text-align: center; font-weight: bold;">{code}<br><span style="font-size: 10px;">{name}</span></div>',
-                unsafe_allow_html=True
-            )
+        for idx, (code, name, param_num) in enumerate(param_list):
+            with param_cols[idx % 4]:
+                color = parameters_8_colors[param_num]
+                st.markdown(
+                    f'<div style="padding: 8px; background-color: {color}; color: white; border-radius: 4px; text-align: center; font-weight: bold;">{code}<br><span style="font-size: 9px;">{name}</span></div>',
+                    unsafe_allow_html=True
+                )
 
 # ============================================================================
 # TAB 3: PREDICTIONS (Data)
