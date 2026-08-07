@@ -370,6 +370,8 @@ INPUT_LAYERS_CONFIG = [
     }
 ]
 
+
+
 # ============================================================================
 # SIDEBAR: LOCATION INPUT
 # ============================================================================
@@ -725,6 +727,7 @@ with tab_inputs:
             ax.patch.set_alpha(0)
             
             # Plot continuous or categorical
+            # Plot continuous or categorical
             if config.get('categorical'):
                 # Categorical colormap
                 cat_cmap = ListedColormap([config['colors'].get(k, '#cccccc') for k in sorted(config['colors'].keys())])
@@ -737,10 +740,23 @@ with tab_inputs:
                 vmin = config.get('vmin')
                 vmax = config.get('vmax')
                 
-                if vmin is None and 'quantile_min' in config:
-                    vmin = np.nanquantile(layer_masked, config['quantile_min'])
-                if vmax is None and 'quantile_max' in config:
-                    vmax = np.nanquantile(layer_masked, config['quantile_max'])
+                # Calculate vmin/vmax from quantiles if not set
+                if vmin is None or vmax is None:
+                    try:
+                        valid_data = layer_masked.compressed()  # Get non-masked values
+                        if len(valid_data) > 0:
+                            if vmin is None and 'quantile_min' in config:
+                                vmin = np.quantile(valid_data, config['quantile_min'])
+                            if vmax is None and 'quantile_max' in config:
+                                vmax = np.quantile(valid_data, config['quantile_max'])
+                            # Fallback if still None
+                            if vmin is None:
+                                vmin = valid_data.min()
+                            if vmax is None:
+                                vmax = valid_data.max()
+                    except:
+                        vmin = vmin or 0
+                        vmax = vmax or 1
                 
                 if config.get('log_scale'):
                     from matplotlib.colors import LogNorm
