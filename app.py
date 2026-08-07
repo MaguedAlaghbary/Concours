@@ -152,7 +152,22 @@ cmap_vulnerability = mcolors.LinearSegmentedColormap.from_list(
 # Use viridis for uncertainty (std dev)
 cmap_std = plt.cm.viridis
 
-cmap_entropy =  plt.cm.davos
+# Use davos for entropy (from cmocean) - use fallback teal colormap
+cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
+    'davos',
+    ['#F0F9FF', '#B3E0F2', '#5AB4AC', '#1A7A7A', '#084B4B']
+)
+
+# Use davos for entropy (from cmocean)
+try:
+    import cmocean.cm as cmo
+    cmap_entropy = cmo.davos
+except:
+    # Fallback if cmocean not installed
+    cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
+        'davos_fallback',
+        ['#F0F9FF', '#B3E0F2', '#5AB4AC', '#1A7A7A', '#084B4B']
+    )
 
 # 5-class categorical for defuzzified layers (with labels)
 vulnerability_class_labels = {
