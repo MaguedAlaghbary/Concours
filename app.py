@@ -196,14 +196,14 @@ with tab1:
         risk_map = create_map_with_legend(lat_input, lon_input, 
                                          "Risk Categories", 
                                          risk_9_colors, RISK_LABELS)
-        st_folium(risk_map, width=500, height=500)
+        st_folium(risk_map, width=500, height=500, key="risk_map")
     
     with col2:
         st.subheader("(b) Management Priority (1-4 levels)")
         priority_map = create_map_with_legend(lat_input, lon_input,
                                              "Priority Zones",
                                              priority_4_colors, PRIORITY_LABELS)
-        st_folium(priority_map, width=500, height=500)
+        st_folium(priority_map, width=500, height=500, key="priority_map") 
 
 # ============================================================================
 # TAB 2: FEATURE IMPORTANCE (Driver Ranks & SHAP)
