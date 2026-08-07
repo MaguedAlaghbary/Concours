@@ -157,8 +157,10 @@ def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_dict, nor
     fig, ax = plt.subplots(figsize=(10, 10), dpi=80)
     
     # Plot raster with colormap
+    cmap_list = ListedColormap([cmap_dict[k] for k in sorted(cmap_dict.keys())])
     im = ax.imshow(raster_data, extent=[lon_min, lon_max, lat_min, lat_max],
-                   cmap=cmap_dict, norm=norm, origin='lower', alpha=0.8)
+               cmap=cmap_list, norm=norm, origin='lower', alpha=0.8)
+
     
     # Styling
     ax.set_xlabel("Longitude")
