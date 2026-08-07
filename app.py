@@ -447,7 +447,7 @@ def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None
     ).add_to(m)
     
     # Legend with tiny horizontal colorbar and class labels
-        legend_html = f'''
+    legend_html = f'''
         <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
                     background-color: white; border:1px solid grey; z-index:9999; 
                     border-radius: 2px; padding: 4px;">
