@@ -966,13 +966,14 @@ with tab2:
         img_buffer.seek(0)
         img_base64 = base64.b64encode(img_buffer.read()).decode()
         plt.close()
-        
+         
         # Create horizontal colorbar
         fig_cbar, ax_cbar = plt.subplots(figsize=(2, 0.25), dpi=80)
         cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_driver, cmap=driver_cmap), 
                            cax=ax_cbar, orientation='horizontal', pad=0.01)
         cbar.set_label('Top Driver', fontsize=8)
-        cbar.ax.set_xticklabels(['D', 'R', 'A', 'S', 'T', 'I', 'C', 'LU'], fontsize=7)
+        # Let matplotlib set ticks automatically
+        cbar.ax.tick_params(labelsize=7)
         
         cbar_buffer = BytesIO()
         plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
