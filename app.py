@@ -5,6 +5,8 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 from matplotlib.colors import ListedColormap, BoundaryNorm
+import os
+import zipfile
 
 st.set_page_config(page_title="Djibouti Aquifer Vulnerability", layout="wide")
 st.title("🗺️ Djibouti Nitrate Vulnerability Mapper")
@@ -15,7 +17,14 @@ st.markdown("**DRASTICLU + ML-based assessment with feature importance**")
 # ============================================================================
 @st.cache_resource
 def load_data():
-    data = xr.open_dataset('djibouti_data_minimal.nc')
+    # If zarr folder doesn't exist, unzip it
+    if not os.path.exists('djibouti_data_minimal.zarr'):
+        if os.path.exists('djibouti_data_minimal.zip'):
+            with zipfile.ZipFile('djibouti_data_minimal.zip', 'r') as zip_ref:
+                zip_ref.extractall('.')
+    
+    data = xr.open_zarr('djibouti_data_minimal.zarr')
+    return data
     return data
 
 try:
