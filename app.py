@@ -79,7 +79,7 @@ cmap_risk = ListedColormap([risk_9_colors[k] for k in risk_ids])
 norm_risk = BoundaryNorm(np.arange(0.5, 10.5, 1), cmap_risk.N)
 
 priority_ids = sorted(priority_4_colors.keys())
-cmap_priority = ListedColormap([priority_4_colors[k] for k in priority_ids])
+cmap_priority = ListedColormap([risk_9_colors[k] for k in priority_ids])
 norm_priority = BoundaryNorm(np.arange(0.5, 5.5, 1), cmap_priority.N)
 
 vuln_ids = sorted(vuln_5_colors.keys())
