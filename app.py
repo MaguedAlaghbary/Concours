@@ -68,14 +68,6 @@ shap_class_colors = {
     5: '#B2182B'
 }
 
-# Y-Hat Class - Categorical (5 classes)
-y_hat_class_colors = {
-    1: '#2B8C3F',  # Very Low
-    2: '#FFE135',  # Low-Moderate
-    3: '#FF8D35',  # Moderate
-    4: '#F72518',  # High
-    5: '#67001F'   # Very High
-}
 
 # Create colormaps (EXACT from notebook)
 risk_ids = sorted(risk_9_colors.keys())
@@ -162,11 +154,11 @@ cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
 try:
     import cmocean.cm as cmo
     cmap_entropy = cmo.davos
-except:
-    # Fallback if cmocean not installed
+except ImportError:
+    # Fallback: teal colormap (davos-inspired)
     cmap_entropy = mcolors.LinearSegmentedColormap.from_list(
-        'davos_fallback',
-        ['#F0F9FF', '#B3E0F2', '#5AB4AC', '#1A7A7A', '#084B4B']
+        'davos',
+        ['#F0FFFF', '#A7D8DE', '#5A9FA5', '#2F5F66', '#0D2626']
     )
 
 # 5-class categorical for defuzzified layers (with labels)
@@ -626,33 +618,10 @@ with tab3:
 # ============================================================================
 # TAB 4: PREDICTION MAPS
 # ============================================================================
-with tab4:
-    st.header("Prediction Maps")
-    
-    col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
     
     with col1:
-        # index_shap: 0-10 (continuous vulnerability)
-        norm_shap = Normalize(vmin=80, vmax=200)
-        shap_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                        'index_shap', cmap_vulnerability, norm_shap,
-                                        title=PREDICTION_TITLES['index_shap'])
-        if shap_map:
-            st_folium(shap_map, width=350, height=350, key=f"shap_index_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # index_shap_std: 11-27 (uncertainty, viridis)
-        norm_shap_std = Normalize(vmin=12, vmax=26)
-        shap_std_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                            'index_shap_std', cmap_std, norm_shap_std,
-                                            title=PREDICTION_TITLES['index_shap_std'])
-        if shap_std_map:
-            st_folium(shap_std_map, width=350, height=350, key=f"shap_std_map_{lat_input}_{lon_input}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # index_shap_class: 1-5 (CATEGORICAL - like risk maps)
+        # index_shap_class: 1-5 (CATEGORICAL)
         vuln_class_cmap = ListedColormap([vulnerability_5_colors[k] for k in sorted(vulnerability_5_colors.keys())])
         norm_shap_class = BoundaryNorm(np.arange(0.5, 6.5, 1), vuln_class_cmap.N)
         shap_class_map = create_map_with_raster_overlay(
@@ -694,7 +663,7 @@ with tab4:
     col1, col2 = st.columns(2)
     
     with col1:
-        # y_hat_log_class: 1-5 (CATEGORICAL - like risk maps)
+        # y_hat_log_class: 1-5 (CATEGORICAL)
         nitrate_class_cmap = ListedColormap([nitrate_5_colors[k] for k in sorted(nitrate_5_colors.keys())])
         norm_yhat_class = BoundaryNorm(np.arange(0.5, 6.5, 1), nitrate_class_cmap.N)
         y_hat_class_map = create_map_with_raster_overlay(
