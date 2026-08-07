@@ -685,12 +685,7 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # ============================================================================
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
-# ============================================================================
-# TAB 0: DRASTICLU INPUT LAYERS
-# ============================================================================
-# ============================================================================
-# TAB 0: DRASTICLU INPUT LAYERS
-# ============================================================================
+'''
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
 
@@ -757,7 +752,54 @@ with tab_inputs:
 
             if m:
                 st_folium(m, width=300, height=300, key=f"input_{config['layer']}_{lat_input}_{lon_input}")
-
+'''
+# ============================================================================
+# USAGE IN TAB: single big map with layer toggle
+# ============================================================================
+with tab_inputs:
+    st.header("📥 DRASTICLU Input Layers (8 Parameters)")
+    
+    layer_names = [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
+    selected_idx = st.selectbox("Choose a layer:", range(len(INPUT_LAYERS_CONFIG)), 
+                                  format_func=lambda i: layer_names[i])
+    config = INPUT_LAYERS_CONFIG[selected_idx]
+    st.info(f"**{config['title']}** | {config['units']}")
+    
+    water_mask = _get_water_mask(data_xr)
+    
+    if config.get('categorical'):
+        # Categorical: use CLASS plotter
+        m = plot_class_layer(
+            data_xr, config['layer'],
+            class_colors=config['colors'], class_labels=config['legend'],
+            title=f"{config['title']} {config['units']}",
+            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(10, 10)
+        )
+    else:
+        # Continuous: use CONTINUOUS plotter
+        layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
+        vmin = config.get('vmin')
+        vmax = config.get('vmax')
+        
+        # Resolve vmin/vmax from quantiles if needed (preserves all original logic)
+        if vmin is None or vmax is None:
+            valid_data = layer_masked.compressed()
+            if len(valid_data) > 0:
+                if vmin is None and 'quantile_min' in config:
+                    vmin = np.quantile(valid_data, config['quantile_min'])
+                if vmax is None and 'quantile_max' in config:
+                    vmax = np.quantile(valid_data, config['quantile_max'])
+        
+        norm_cont = LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale') else Normalize(vmin=vmin, vmax=vmax)
+        
+        m = plot_continuous_layer(
+            data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
+            title=f"{config['title']} {config['units']}", units=config['units'],
+            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(10, 10)
+        )
+    
+    if m:
+        st_folium(m, width=900, height=700, key=f"layer_{config['layer']}")
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
 # ============================================================================
