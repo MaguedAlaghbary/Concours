@@ -171,6 +171,27 @@ except:
 
 # 5-class categorical for defuzzified layers (with labels)
 # 5-class categorical colormaps (for defuzzified)
+# ============================================================================
+# CLASS LABELS FOR DEFUZZIFIED MAPS
+# ============================================================================
+
+vulnerability_class_labels = {
+    1: "Very Low",
+    2: "Low",
+    3: "Moderate",
+    4: "High",
+    5: "Very High"
+}
+
+nitrate_class_labels = {
+    1: "Very Low",
+    2: "Low",
+    3: "Moderate",
+    4: "High",
+    5: "Very High"
+}
+
+# 5-class categorical colormaps (for defuzzified)
 vulnerability_5_colors = {
     1: '#440154',  # Very Low - Dark purple
     2: '#31688E',  # Low - Blue
