@@ -589,7 +589,7 @@ st.sidebar.header("📍 Query Location")
 
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    lat_input = st.number_input("Latitude", min_value=10.9, max_value=12.7, value=11.5, step=0.01, key="lat_slider")
+    lat_input = st.number_input("Latitude", min_value=10.9, max_value=12.7, value=11.9, step=0.01, key="lat_slider")
 with col2:
     lon_input = st.number_input("Longitude", min_value=41.7, max_value=43.4, value=42.9, step=0.01, key="lon_slider")
 
@@ -863,7 +863,7 @@ with tab_inputs:
     if show_nitrate_only:
         # NITRATE ALONE: blank base map + nitrate points
         m = folium.Map(
-            location=[11.9, 42.9],  # Djibouti center
+            location=[11.5, 42.9],  # Djibouti center
             zoom_start=11,
             tiles="OpenStreetMap"
         )
@@ -949,7 +949,7 @@ with tab_inputs:
 # ============================================================================
 # TAB 3: RISK & PRIORITY MAPS
 # ============================================================================
-with tab3:
+with tab2:
     st.header("🗺️ Risk & Priority Assessment")
     
     # Selectbox to toggle between Risk and Priority
@@ -983,7 +983,7 @@ with tab3:
 # ============================================================================
 # TAB 2: DRIVER ATTRIBUTION ANALYSIS
 # ============================================================================
-with tab2:
+with tab3:
     st.header("🎯 Driver Attribution Analysis")
     
     # Verify driver layers exist (fail fast with one clear message)
