@@ -113,9 +113,6 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     
     return m
 
-# ============================================================================
-# DEFINE COLOR SCHEMES (EXACT from Douda notebook)
-# ============================================================================
 
 # ============================================================================
 # CATEGORY LABEL MAPS (For categorical input layers)
@@ -234,9 +231,6 @@ DRIVER_MAP = {
 # PREDICTION LAYER TITLES & COLORMAPS (FROM NOTEBOOK)
 # ============================================================================
 
-# ============================================================================
-# PREDICTION LAYER TITLES & COLORMAPS (EXACT FROM NOTEBOOK)
-# ============================================================================
 
 PREDICTION_TITLES = {
     'index_shap': "Specific Vulnerability",
@@ -352,7 +346,7 @@ DRIVER_PARAM_MAP = {
     7: 'LU'
 }
 
-
+width, height = 900, 600
 # ============================================================================
 # INPUT LAYERS CONFIGURATION (DRASTICLU)
 # ============================================================================
@@ -519,7 +513,7 @@ def _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64,
     """Folium map + raster ImageOverlay + a CircleMarker at the queried point."""
     m = folium.Map(
         location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-        zoom_start=12,
+        zoom_start=11,
         tiles="OpenStreetMap"
     )
     folium.raster_layers.ImageOverlay(
@@ -701,12 +695,7 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # ============================================================================
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
-# ============================================================================
-# TAB 0: DRASTICLU INPUT LAYERS
-# ============================================================================
-# ============================================================================
-# TAB 0: DRASTICLU INPUT LAYERS
-# ============================================================================
+
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
@@ -797,7 +786,7 @@ with tab_inputs:
     
     # Render map FULL-WIDTH as main figure
     if m:
-        st_folium(m, width=1200, height=700, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
+        st_folium(m, width=width, height=height, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
 
 
 
@@ -833,7 +822,7 @@ with tab3:
     )
     
     if m_assess:
-        st_folium(m_assess, width=1200, height=700, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
+        st_folium(m_assess, width=width, height=height, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 2: DRIVER ATTRIBUTION ANALYSIS
@@ -890,7 +879,7 @@ with tab2:
     )
     
     if m_driver:
-        st_folium(m_driver, width=1200, height=700, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
+        st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
     
     # Legend
     st.markdown("---")
@@ -930,51 +919,12 @@ with tab2:
 # TAB 4: PREDICTION MAPS — VULNERABILITY & CONCENTRATION
 # ============================================================================
 with tab1:
-    st.header("📊 Prediction Maps: Vulnerability & Concentration")
+    st.header("📊 Prediction Maps: Concentration & Vulnerability")
     
     # Create two sub-tabs
-    sub_tab_vuln, sub_tab_conc = st.tabs(["🔴 Vulnerability", "🟠 Concentration"])
+    sub_tab_vuln, sub_tab_conc = st.tabs(["🟠 Concentration", "🔴 Vulnerability"])
     
-    # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
-    with sub_tab_vuln:
-        st.subheader("Groundwater Vulnerability Index (SHAP-based)")
-        
-        # Vulnerability layer options
-        vuln_options = [
-            ("index_shap", "Continuous Index (80–200)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
-            ("index_shap_std", "Uncertainty (12–26)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
-            ("index_shap_class", "5-Class (Low–Very High)", 'index_shap_class', None, None, "class"),
-            ("index_shap_entropy", "Entropy (0–1)", 'index_shap_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
-        ]
-        
-        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
-        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
-        vuln_layer = vuln_options[vuln_idx]
-        
-        st.info(f"**{vuln_layer[1]}**")
-        
-        if vuln_layer[2] not in data_xr:
-            st.error(f"❌ Layer {vuln_layer[2]} not found")
-            st.stop()
-        
-        water_mask = _get_water_mask(data_xr)
-        
-        if vuln_layer[5] == "class":
-            # CLASS layer: index_shap_class
-            m_vuln = plot_class_layer(
-                data_xr, vuln_layer[2],
-                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
-                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-            )
-        else:
-            # CONTINUOUS layers
-            m_vuln = plot_continuous_layer(
-                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
-                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-            )
-        
-        if m_vuln:
-            st_folium(m_vuln, width=1200, height=700, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
+   
     
     # ========== SUB-TAB 2: CONCENTRATION MAPS ==========
     with sub_tab_conc:
@@ -1027,8 +977,48 @@ with tab1:
                 st.warning("⚠️ Measurement data not loaded", icon="🧪")
         
         if m_conc:
-            st_folium(m_conc, width=1200, height=700, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
-
+            st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+            
+     # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
+    with sub_tab_vuln:
+        st.subheader("Groundwater Vulnerability Index (SHAP-based)")
+        
+        # Vulnerability layer options
+        vuln_options = [
+            ("index_shap", "Continuous Index (80–200)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
+            ("index_shap_std", "Uncertainty (12–26)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
+            ("index_shap_class", "5-Class (Low–Very High)", 'index_shap_class', None, None, "class"),
+            ("index_shap_entropy", "Entropy (0–1)", 'index_shap_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+        ]
+        
+        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
+        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
+        vuln_layer = vuln_options[vuln_idx]
+        
+        st.info(f"**{vuln_layer[1]}**")
+        
+        if vuln_layer[2] not in data_xr:
+            st.error(f"❌ Layer {vuln_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if vuln_layer[5] == "class":
+            # CLASS layer: index_shap_class
+            m_vuln = plot_class_layer(
+                data_xr, vuln_layer[2],
+                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        else:
+            # CONTINUOUS layers
+            m_vuln = plot_continuous_layer(
+                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        
+        if m_vuln:
+            st_folium(m_vuln, width=width, height=height, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # FOOTER
@@ -1038,7 +1028,7 @@ st.sidebar.markdown("""
 ### 📚 Model
 - **Method:** DRASTICLU + QRF + SHAP
 - **Inputs:** 8 DRASTICLU layers
-- **Outputs:** 16 variables (ranks, importance, predictions, uncertainty)
+- **Outputs:** 16 variables (concentrations, vulnerbaility, attributions, uncertainty)
 - **Classes:** Risk (1-9), Priority (1-4)
 - **Uncertainty:** Quantiles + entropy
 """)
