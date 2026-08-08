@@ -1161,7 +1161,7 @@ with tab1:
             # Overlay measurement ground truth classes (pre-calculated in df) if toggled on
             if show_ground_truth and m_conc and df_nitrate_points is not None and not df_nitrate_points.empty:
                 m_conc = add_measurement_classes_layer(m_conc, df_nitrate_points, nitrate_5_colors, nitrate_class_labels)
-                folium.LayerControl().add_to(m_conc) 
+                folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
                 st.success("✓ Ground truth classes overlaid", icon="🧪")
         else:
             # CONTINUOUS layers (concentration, residuals/error, entropy)
@@ -1175,11 +1175,14 @@ with tab1:
                 if df_nitrate_points is not None and not df_nitrate_points.empty:
                     norm_residuals = Normalize(vmin=-50, vmax=50)
                     m_conc = add_measurement_residuals_layer(m_conc, df_nitrate_points, cmap_std, norm_residuals)
-                    folium.LayerControl().add_to(m_conc) 
+                    folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
                     st.success("✓ Ground truth residuals overlaid", icon="🧪")
         
         if m_conc:
             st_folium(m_conc, width=1200, height=700, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+
+
+
 
 
 
