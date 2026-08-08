@@ -62,7 +62,7 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     
     Args:
         m: folium.Map
-        df_nitrate: DataFrame with lat/lon/no3 columns
+        df_nitrate: DataFrame with lat/lon/no3 columns (already lowercased)
         cmap: matplotlib colormap
         norm_obj: matplotlib norm (e.g. Normalize(vmin=10, vmax=100))
         show_points: boolean to render points
@@ -70,15 +70,17 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     Returns:
         Modified folium.Map with measurement points
     """
-    if df_nitrate is None or not show_points or df_nitrate.empty:
+    if not show_points or df_nitrate is None or df_nitrate.empty:
         return m
     
-    col_names = {k.lower(): k for k in df_nitrate.columns}
-    lat_col = col_names.get('latitude') or col_names.get('lat')
-    lon_col = col_names.get('longitude') or col_names.get('lon')
-    no3_col = col_names.get('NO3') or col_names.get('nitrate') or col_names.get('concentration')
+    # Columns are already lowercased by load_nitrate_points()
+    lat_col = 'latitude'
+    lon_col = 'longitude'
+    no3_col = 'NO3'
     
-    if not all([lat_col, lon_col, no3_col]):
+    # Verify columns exist
+    if lat_col not in df_nitrate.columns or lon_col not in df_nitrate.columns or no3_col not in df_nitrate.columns:
+        st.error(f"❌ Missing columns. Found: {list(df_nitrate.columns)}")
         return m
     
     fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
@@ -86,8 +88,8 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     
     for idx, row in df_nitrate.iterrows():
         try:
-            lon = float(row[lon_col])
             lat = float(row[lat_col])
+            lon = float(row[lon_col])
             no3_val = float(row[no3_col])
             
             # Normalize and get color
@@ -99,24 +101,29 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
                 int(rgba[2]*255)
             )
             
-            # Add circle marker
+            # Add circle marker with bold border to make visible
             folium.CircleMarker(
                 location=[lat, lon],
-                radius=5,
-                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
-                color=hex_color,
-                fill=True,
+                radius=7,
+                popup=f"<b>NO₃⁻: {no3_val:.1f} mg/L</b><br>{lat:.4f}°N, {lon:.4f}°E",
+                tooltip=f"NO₃: {no3_val:.1f}",
+                color='black',  # Bold border
                 fillColor=hex_color,
-                fillOpacity=0.8,
-                weight=1,
-                opacity=0.9
+                fill=True,
+                fillOpacity=0.9,
+                weight=2,
+                opacity=1.0
             ).add_to(fg_nitrate)
             count += 1
-        except (ValueError, TypeError, KeyError):
+        except Exception as e:
             continue
     
     if count > 0:
         fg_nitrate.add_to(m)
+        folium.LayerControl().add_to(m)
+        st.info(f"✅ Added {count} nitrate measurement points")
+    else:
+        st.warning("⚠️ No valid measurement points found")
     
     return m
 
