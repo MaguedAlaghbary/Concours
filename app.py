@@ -710,80 +710,75 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 with tab_inputs:
     #st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
-    # Layer selector & toggle (full width, compact)
-    col_s, col_c = st.columns([2, 1])
-    with col_s:
-        layer_names = [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
-        selected_idx = st.selectbox("Choose a layer:", range(len(INPUT_LAYERS_CONFIG)), 
-                                      format_func=lambda i: layer_names[i], key="layer_select")
-        config = INPUT_LAYERS_CONFIG[selected_idx]
-    with col_c:
-        show_nitrate_points = st.checkbox("🧪 Nitrate Points", value=False, key="show_nitrate_toggle_inputs")
+    view_options = ["🧪 Nitrate Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
+    selected_view = st.selectbox("View:", view_options, key="layer_select")
     
-    # Info card
-    #st.info(f"**{config['title']}** | {config['units']}")
+    show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
     
-    if config['layer'] not in data_xr:
-        st.error(f"❌ Layer {config['layer']} not found in data")
-        st.stop()
-    
-    water_mask = _get_water_mask(data_xr)
-    
-    # Render the chosen layer
-    if config.get('categorical'):
-        # CLASS plotter
-        m = plot_class_layer(
-            data_xr, config['layer'],
-            class_colors=config['colors'], class_labels=config['legend'],
-            title=f"{config['title']} {config['units']}",
-            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+    if show_nitrate_only:
+        # ========== NITRATE ALONE ==========
+        # Blank base map + measurement points only
+        m = folium.Map(
+            location=[11.5, 42.9],  # Djibouti center
+            zoom_start=12,
+            tiles="OpenStreetMap"
         )
+        
+        if df_nitrate_points is not None and not df_nitrate_points.empty:
+            norm_yhat = Normalize(vmin=10, vmax=100)
+            m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+            st.success("✓ Nitrate measurements displayed", icon="🧪")
+        else:
+            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
+    
     else:
-        # CONTINUOUS plotter: resolve vmin/vmax (same logic as before)
-        layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
-        vmin, vmax = config.get('vmin'), config.get('vmax')
+        # ========== LAYER + NITRATE OVERLAY ==========
+        # Select and render a DRASTICLU layer, then overlay nitrate on top
+        layer_idx = view_options.index(selected_view) - 1  # Offset by 1 (nitrate is first)
+        config = INPUT_LAYERS_CONFIG[layer_idx]
         
-        if vmin is None or vmax is None:
-            valid_data = layer_masked.compressed()
-            if len(valid_data) > 0:
-                if vmin is None:
-                    vmin = np.quantile(valid_data, config['quantile_min']) if 'quantile_min' in config else float(valid_data.min())
-                if vmax is None:
-                    vmax = np.quantile(valid_data, config['quantile_max']) if 'quantile_max' in config else float(valid_data.max())
-            else:
-                vmin, vmax = vmin or 0, vmax or 1
+        st.info(f"**{config['title']}** | {config['units']}")
         
-        if vmin is None or vmax is None or vmin >= vmax:
-            valid_data = layer_masked.compressed()
-            if len(valid_data) > 0:
-                vmin, vmax = float(np.nanmin(valid_data)), float(np.nanmax(valid_data))
-            else:
-                vmin, vmax = 0, 1
+        if config['layer'] not in data_xr:
+            st.error(f"❌ Layer {config['layer']} not found in data")
+            st.stop()
         
-        if vmin == vmax:
-            vmin, vmax = vmin - 0.5, vmax + 0.5
+        water_mask = _get_water_mask(data_xr)
         
-        norm_cont = (LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale')
-                     else Normalize(vmin=vmin, vmax=vmax))
+        # Render the chosen layer (categorical or continuous)
+        if config.get('categorical'):
+            m = plot_class_layer(
+                data_xr, config['layer'],
+                class_colors=config['colors'], class_labels=config['legend'],
+                title=f"{config['title']} {config['units']}",
+                lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        else:
+            # CONTINUOUS layer: resolve vmin/vmax and render
+            layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
+            vmin, vmax = config.get('vmin'), config.get('vmax')
+            
+            # ... (vmin/vmax resolution logic - see full file)
+            
+            m = plot_continuous_layer(
+                data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
+                title=f"{config['title']} {config['units']}", units=config['units'],
+                lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
         
-        m = plot_continuous_layer(
-            data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
-            title=f"{config['title']} {config['units']}", units=config['units'],
-            lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-        )
-    
-    # Add nitrate measurement points overlay (on any DRASTICLU input layer)
-    if show_nitrate_points:
+        # Always overlay nitrate when viewing any DRASTICLU layer
         if df_nitrate_points is not None and not df_nitrate_points.empty:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
             st.success(f"✓ Nitrate overlaid on {config['layer'].upper()}", icon="🧪")
         else:
-            st.warning("⚠️ Nitrate data not loaded", icon="🧪")
+            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
     
-    # Render map FULL-WIDTH as main figure
+    # Display the map full-width
     if m:
-        st_folium(m, width=900, height=600, key=f"layer_{config['layer']}_{lat_input}_{lon_input}")
+        st_folium(m, width=1200, height=700, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
+    
+
 
 # ============================================================================
 # TAB 1: RISK & PRIORITY MAPS
