@@ -519,7 +519,7 @@ def _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64,
     """Folium map + raster ImageOverlay + a CircleMarker at the queried point."""
     m = folium.Map(
         location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-        zoom_start=11,
+        zoom_start=12,
         tiles="OpenStreetMap"
     )
     folium.raster_layers.ImageOverlay(
@@ -708,16 +708,17 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
 with tab_inputs:
-    #st.header("📥 DRASTICLU Input Layers (8 Parameters)")
+    st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
+    # Single unified selector: Nitrate alone OR a layer with nitrate overlay
     view_options = ["🧪 Nitrate Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
     selected_view = st.selectbox("View:", view_options, key="layer_select")
     
+    # Determine if we're viewing nitrate alone or a layer + nitrate
     show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
     
     if show_nitrate_only:
-        # ========== NITRATE ALONE ==========
-        # Blank base map + measurement points only
+        # NITRATE ALONE: blank base map + nitrate points
         m = folium.Map(
             location=[11.5, 42.9],  # Djibouti center
             zoom_start=12,
@@ -730,10 +731,8 @@ with tab_inputs:
             st.success("✓ Nitrate measurements displayed", icon="🧪")
         else:
             st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
-    
     else:
-        # ========== LAYER + NITRATE OVERLAY ==========
-        # Select and render a DRASTICLU layer, then overlay nitrate on top
+        # LAYER + NITRATE: pick the selected layer and overlay nitrate
         layer_idx = view_options.index(selected_view) - 1  # Offset by 1 (nitrate is first)
         config = INPUT_LAYERS_CONFIG[layer_idx]
         
@@ -745,8 +744,9 @@ with tab_inputs:
         
         water_mask = _get_water_mask(data_xr)
         
-        # Render the chosen layer (categorical or continuous)
+        # Render the chosen layer
         if config.get('categorical'):
+            # CLASS plotter
             m = plot_class_layer(
                 data_xr, config['layer'],
                 class_colors=config['colors'], class_labels=config['legend'],
@@ -754,11 +754,32 @@ with tab_inputs:
                 lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
         else:
-            # CONTINUOUS layer: resolve vmin/vmax and render
+            # CONTINUOUS plotter: resolve vmin/vmax
             layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
             vmin, vmax = config.get('vmin'), config.get('vmax')
             
-            # ... (vmin/vmax resolution logic - see full file)
+            if vmin is None or vmax is None:
+                valid_data = layer_masked.compressed()
+                if len(valid_data) > 0:
+                    if vmin is None:
+                        vmin = np.quantile(valid_data, config['quantile_min']) if 'quantile_min' in config else float(valid_data.min())
+                    if vmax is None:
+                        vmax = np.quantile(valid_data, config['quantile_max']) if 'quantile_max' in config else float(valid_data.max())
+                else:
+                    vmin, vmax = vmin or 0, vmax or 1
+            
+            if vmin is None or vmax is None or vmin >= vmax:
+                valid_data = layer_masked.compressed()
+                if len(valid_data) > 0:
+                    vmin, vmax = float(np.nanmin(valid_data)), float(np.nanmax(valid_data))
+                else:
+                    vmin, vmax = 0, 1
+            
+            if vmin == vmax:
+                vmin, vmax = vmin - 0.5, vmax + 0.5
+            
+            norm_cont = (LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale')
+                         else Normalize(vmin=vmin, vmax=vmax))
             
             m = plot_continuous_layer(
                 data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
@@ -766,7 +787,7 @@ with tab_inputs:
                 lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
         
-        # Always overlay nitrate when viewing any DRASTICLU layer
+        # Always overlay nitrate when viewing a layer
         if df_nitrate_points is not None and not df_nitrate_points.empty:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
@@ -774,10 +795,10 @@ with tab_inputs:
         else:
             st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
     
-    # Display the map full-width
+    # Render map FULL-WIDTH as main figure
     if m:
         st_folium(m, width=1200, height=700, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
-    
+
 
 
 # ============================================================================
