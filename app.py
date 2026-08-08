@@ -40,7 +40,7 @@ except FileNotFoundError:
 @st.cache_data
 def load_nitrate_points():
     try:
-        df_nitrate = pd.read_csv('results.csv')
+        df_nitrate = pd.read_csv('douda_results.csv')
         # Ensure column names are correct
         df_nitrate.columns = df_nitrate.columns.str.strip().str.lower()
         return df_nitrate
