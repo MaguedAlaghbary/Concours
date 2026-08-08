@@ -62,7 +62,7 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     
     Args:
         m: folium.Map
-        df_nitrate: DataFrame with lat/lon/no3 columns
+        df_nitrate: DataFrame with lat/lon/no3 columns (columns lowercase from load_nitrate_points)
         cmap: matplotlib colormap
         norm_obj: matplotlib norm (e.g. Normalize(vmin=10, vmax=100))
         show_points: boolean to render points
@@ -70,14 +70,16 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     Returns:
         Modified folium.Map with measurement points
     """
-    if df_nitrate is None or not show_points or df_nitrate.empty:
+    if not show_points or df_nitrate is None or df_nitrate.empty:
         return m
     
+    # Use flexible column name matching (same pattern as working functions)
     col_names = {k.lower(): k for k in df_nitrate.columns}
     lat_col = col_names.get('latitude') or col_names.get('lat')
     lon_col = col_names.get('longitude') or col_names.get('lon')
     no3_col = col_names.get('NO3') or col_names.get('nitrate') or col_names.get('concentration')
     
+    # Return early if columns not found
     if not all([lat_col, lon_col, no3_col]):
         return m
     
@@ -86,8 +88,8 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     
     for idx, row in df_nitrate.iterrows():
         try:
-            lon = float(row[lon_col])
             lat = float(row[lat_col])
+            lon = float(row[lon_col])
             no3_val = float(row[no3_col])
             
             # Normalize and get color
@@ -99,22 +101,24 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
                 int(rgba[2]*255)
             )
             
-            # Add circle marker
+            # Add circle marker - make it visible with black border
             folium.CircleMarker(
                 location=[lat, lon],
-                radius=5,
-                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
-                color=hex_color,
-                fill=True,
+                radius=6,
+                popup=f"<b>NO₃⁻: {no3_val:.1f} mg/L</b><br>{lat:.4f}°N, {lon:.4f}°E",
+                tooltip=f"NO₃: {no3_val:.1f}",
+                color='black',  # Black border for contrast
                 fillColor=hex_color,
-                fillOpacity=0.8,
-                weight=1,
-                opacity=0.9
+                fill=True,
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
             ).add_to(fg_nitrate)
             count += 1
         except (ValueError, TypeError, KeyError):
             continue
     
+    # Only add layer if we have points
     if count > 0:
         fg_nitrate.add_to(m)
     
@@ -920,6 +924,7 @@ with tab_inputs:
         if df_nitrate_points is not None and not df_nitrate_points.empty:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+            folium.LayerControl().add_to(m)  # Add layer control AFTER adding layers
             st.success("✓ Nitrate measurements displayed", icon="🧪")
         else:
             st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
