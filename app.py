@@ -581,7 +581,7 @@ INPUT_LAYERS_CONFIG = [
 ]
 
 
-
+width, length = 900, 600
 # ============================================================================
 # SIDEBAR: LOCATION INPUT
 # ============================================================================
@@ -662,7 +662,7 @@ def _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64,
     """Folium map + raster ImageOverlay + a CircleMarker at the queried point."""
     m = folium.Map(
         location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-        zoom_start=12,
+        zoom_start=11,
         tiles="OpenStreetMap"
     )
     folium.raster_layers.ImageOverlay(
@@ -863,8 +863,8 @@ with tab_inputs:
     if show_nitrate_only:
         # NITRATE ALONE: blank base map + nitrate points
         m = folium.Map(
-            location=[11.5, 42.9],  # Djibouti center
-            zoom_start=12,
+            location=[11.9, 42.9],  # Djibouti center
+            zoom_start=11,
             tiles="OpenStreetMap"
         )
         
@@ -942,7 +942,7 @@ with tab_inputs:
     
     # Render map FULL-WIDTH as main figure
     if m:
-        st_folium(m, width=1200, height=700, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
+        st_folium(m, width=width, height=height, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
 
 
 
@@ -978,7 +978,7 @@ with tab3:
     )
     
     if m_assess:
-        st_folium(m_assess, width=1200, height=700, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
+        st_folium(m_assess, width=width, height=height, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 2: DRIVER ATTRIBUTION ANALYSIS
@@ -1035,92 +1035,21 @@ with tab2:
     )
     
     if m_driver:
-        st_folium(m_driver, width=1200, height=700, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
+        st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
     
-    # Legend
-    st.markdown("---")
-    st.subheader("🎨 DRASTICLU Parameter Legend")
-    
-    col_leg1, col_leg2, col_leg3 = st.columns(3)
-    
-    param_list = [
-        ('D', 'Depth', 1),
-        ('R', 'Recharge', 2),
-        ('A', 'Aquifer', 3),
-        ('S', 'Soil', 4),
-        ('T', 'Topography', 5),
-        ('I', 'Impact', 6),
-        ('C', 'Conductivity', 7),
-        ('LU', 'Land Use', 8),
-    ]
-    
-    for idx, (code, name, param_num) in enumerate(param_list):
-        if idx < 3:
-            col = col_leg1
-        elif idx < 6:
-            col = col_leg2
-        else:
-            col = col_leg3
-        
-        with col:
-            color = parameters_8_colors[param_num]
-            st.markdown(
-                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 10px;">'
-                f'<b>{code}</b> {name}</div>',
-                unsafe_allow_html=True
-            )
+   
 
 
 # ============================================================================
 # TAB 4: PREDICTION MAPS — VULNERABILITY & CONCENTRATION
 # ============================================================================
 with tab1:
-    st.header("📊 Prediction Maps: Vulnerability & Concentration")
+    st.header("📊 Prediction Maps: Concentration & Vulnerability")
     
     # Create two sub-tabs
-    sub_tab_vuln, sub_tab_conc = st.tabs(["🔴 Vulnerability", "🟠 Concentration"])
+    sub_tab_conc, sub_tab_vuln = st.tabs(["🟠 Concentration", "🔴 Vulnerability"])
     
-    # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
-    with sub_tab_vuln:
-        st.subheader("Groundwater Vulnerability Index (SHAP-based)")
-        
-        # Vulnerability layer options
-        vuln_options = [
-            ("index_shap", "Continuous Index (80–200)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
-            ("index_shap_std", "Uncertainty (12–26)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
-            ("index_shap_class", "5-Class (Low–Very High)", 'index_shap_class', None, None, "class"),
-            ("index_shap_entropy", "Entropy (0–1)", 'index_shap_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
-        ]
-        
-        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
-        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
-        vuln_layer = vuln_options[vuln_idx]
-        
-        st.info(f"**{vuln_layer[1]}**")
-        
-        if vuln_layer[2] not in data_xr:
-            st.error(f"❌ Layer {vuln_layer[2]} not found")
-            st.stop()
-        
-        water_mask = _get_water_mask(data_xr)
-        
-        if vuln_layer[5] == "class":
-            # CLASS layer: index_shap_class
-            m_vuln = plot_class_layer(
-                data_xr, vuln_layer[2],
-                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
-                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-            )
-        else:
-            # CONTINUOUS layers
-            m_vuln = plot_continuous_layer(
-                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
-                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-            )
-        
-        if m_vuln:
-            st_folium(m_vuln, width=1200, height=700, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
-    
+   
     # ========== SUB-TAB 2: CONCENTRATION MAPS ==========
     with sub_tab_conc:
         st.subheader("Predicted NO₃⁻ Concentration (mg/L)")
@@ -1187,9 +1116,48 @@ with tab1:
                     st.success("✓ Ground truth residuals overlaid", icon="🧪")
         
         if m_conc:
-            st_folium(m_conc, width=1200, height=700, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+            st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
-
+    # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
+    with sub_tab_vuln:
+        st.subheader("Groundwater Vulnerability Index (SHAP-based)")
+        
+        # Vulnerability layer options
+        vuln_options = [
+            ("index_shap", "Continuous Index (80–200)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
+            ("index_shap_std", "Uncertainty (12–26)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
+            ("index_shap_class", "5-Class (Low–Very High)", 'index_shap_class', None, None, "class"),
+            ("index_shap_entropy", "Entropy (0–1)", 'index_shap_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+        ]
+        
+        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
+        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
+        vuln_layer = vuln_options[vuln_idx]
+        
+        st.info(f"**{vuln_layer[1]}**")
+        
+        if vuln_layer[2] not in data_xr:
+            st.error(f"❌ Layer {vuln_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if vuln_layer[5] == "class":
+            # CLASS layer: index_shap_class
+            m_vuln = plot_class_layer(
+                data_xr, vuln_layer[2],
+                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        else:
+            # CONTINUOUS layers
+            m_vuln = plot_continuous_layer(
+                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        
+        if m_vuln:
+            st_folium(m_vuln, width=width, height=height, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
 
 
 
