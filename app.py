@@ -74,6 +74,7 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     
     # Match NO3 - try many variations (handles unicode, different spellings)
     no3_col = (col_names.get('NO3') or 
+               col_names.get('no3') or 
                col_names.get('no₃') or  # Unicode subscript
                col_names.get('nitrate') or 
                col_names.get('concentration') or
