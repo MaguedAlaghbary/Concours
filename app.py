@@ -23,7 +23,7 @@ st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
 # ============================================================================
 @st.cache_resource
 def load_data():
-    with open('djibouti_data_minimal.pkl', 'rb') as f:
+    with open('douda_minimal.pkl', 'rb') as f:
         data = pickle.load(f)
     return data
 
@@ -35,12 +35,12 @@ except FileNotFoundError:
     st.stop()
 
 # ============================================================================
-# LOAD NITRATE MEASUREMENT POINTS
+# LOAD NITRATE MEASUREMENT POINTS (PRE-ENRICHED WITH ERROR & CLASS COLUMNS)
 # ============================================================================
 @st.cache_data
 def load_nitrate_points():
     try:
-        df_nitrate = pd.read_csv('lat_lon_d_n_data.csv')
+        df_nitrate = pd.read_csv('results.csv')
         # Ensure column names are correct
         df_nitrate.columns = df_nitrate.columns.str.strip().str.lower()
         return df_nitrate
@@ -56,19 +56,159 @@ df_nitrate_points = load_nitrate_points()
 # ============================================================================
 # FUNCTION TO ADD NITRATE POINTS TO FOLIUM MAP
 # ============================================================================
-def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
-    """Add nitrate measurement points as a folium FeatureGroup (toggleable)"""
-    if df_nitrate is None or not show_points:
+def add_measurement_residuals_layer(m, df_nitrate, cmap, norm_obj):
+    """
+    Overlay measurement residuals (pre-calculated in df) as colored points.
+    
+    Assumes df_nitrate has columns:
+        - latitude, longitude: measurement locations
+        - residual: pre-calculated error (actual - predicted)
+    
+    Args:
+        m: folium.Map
+        df_nitrate: DataFrame with lat/lon/residual columns
+        cmap: matplotlib colormap (e.g., diverging blue-red)
+        norm_obj: matplotlib norm (e.g., Normalize(vmin=-50, vmax=50))
+    
+    Returns:
+        Modified folium.Map with measurement residual points
+    """
+    if df_nitrate is None or df_nitrate.empty:
         return m
     
-    fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    residual_col = col_names.get('residual') or col_names.get('error')
     
-    # Get colormap RGBA values
+    if not all([lat_col, lon_col, residual_col]):
+        return m
+    
+    fg_residuals = folium.FeatureGroup(name='🧪 Measurement Residuals (Actual − Predicted)', show=True)
+    count = 0
+    
     for idx, row in df_nitrate.iterrows():
         try:
-            lon = float(row['longitude'])
-            lat = float(row['latitude'])
-            no3_val = float(row['no3'])  # or 'NO3' or 'nitrate' depending on column name
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            residual_val = float(row[residual_col])
+            
+            # Normalize residual and get color
+            normalized_residual = norm_obj(residual_val)
+            rgba = cmap(normalized_residual)
+            hex_color = '#{:02x}{:02x}{:02x}'.format(
+                int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255)
+            )
+            
+            # Add circle marker
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                popup=f"Error: {residual_val:+.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
+                color=hex_color,
+                fill=True,
+                fillColor=hex_color,
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
+            ).add_to(fg_residuals)
+            count += 1
+        except (ValueError, TypeError, KeyError):
+            continue
+    
+    if count > 0:
+        fg_residuals.add_to(m)
+    
+    return m
+
+
+def add_measurement_classes_layer(m, df_nitrate, class_colors, class_labels):
+    """
+    Overlay measurement binned classes (pre-calculated in df) as colored points.
+    
+    Assumes df_nitrate has columns:
+        - latitude, longitude: measurement locations
+        - y_class or predicted_class: pre-calculated class number (1-5)
+    
+    Args:
+        m: folium.Map
+        df_nitrate: DataFrame with lat/lon/y_class columns
+        class_colors: dict mapping class number → hex color
+        class_labels: dict mapping class number → label string
+    
+    Returns:
+        Modified folium.Map with measurement class points
+    """
+    if df_nitrate is None or df_nitrate.empty:
+        return m
+    
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    class_col = col_names.get('y_class') or col_names.get('predicted_class')
+    
+    if not all([lat_col, lon_col, class_col]):
+        return m
+    
+    fg_meas_classes = folium.FeatureGroup(name='🧪 Measurement Classes (Ground Truth)', show=True)
+    count = 0
+    
+    for idx, row in df_nitrate.iterrows():
+        try:
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            class_num = int(row[class_col])
+            
+            label = class_labels.get(class_num, str(class_num))
+            color = class_colors.get(class_num, '#cccccc')
+            
+            # Add circle marker
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                popup=f"Class: {class_num} ({label})<br>{lat:.4f}°N, {lon:.4f}°E",
+                color=color,
+                fill=True,
+                fillColor=color,
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
+            ).add_to(fg_meas_classes)
+            count += 1
+        except (ValueError, TypeError, KeyError):
+            continue
+    
+    if count > 0:
+        fg_meas_classes.add_to(m)
+    
+    return m
+
+
+    """
+    Add nitrate measurement points to folium map with color-coding by concentration.
+    Handles flexible column names (no3, NO3, nitrate, concentration, etc.)
+    """
+    if df_nitrate is None or not show_points or df_nitrate.empty:
+        return m
+    
+    # Identify column names (case-insensitive, handles variations)
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    no3_col = col_names.get('no3') or col_names.get('nitrate') or col_names.get('concentration')
+    
+    if not all([lat_col, lon_col, no3_col]):
+        return m  # Silently return if columns not found
+    
+    fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
+    count = 0
+    
+    for idx, row in df_nitrate.iterrows():
+        try:
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            no3_val = float(row[no3_col])
             
             # Normalize and get color
             normalized_val = norm_obj(no3_val)
@@ -82,8 +222,8 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
             # Add circle marker
             folium.CircleMarker(
                 location=[lat, lon],
-                radius=6,
-                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>Lat: {lat:.4f}°<br>Lon: {lon:.4f}°",
+                radius=5,
+                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
                 color=hex_color,
                 fill=True,
                 fillColor=hex_color,
@@ -91,10 +231,13 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
                 weight=1,
                 opacity=0.9
             ).add_to(fg_nitrate)
-        except (ValueError, KeyError) as e:
+            count += 1
+        except (ValueError, TypeError, KeyError):
             continue
     
-    fg_nitrate.add_to(m)
+    if count > 0:
+        fg_nitrate.add_to(m)
+    
     return m
 
 # ============================================================================
@@ -503,7 +646,7 @@ def _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64,
     """Folium map + raster ImageOverlay + a CircleMarker at the queried point."""
     m = folium.Map(
         location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-        zoom_start=10,
+        zoom_start=12,
         tiles="OpenStreetMap"
     )
     folium.raster_layers.ImageOverlay(
@@ -693,105 +836,137 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # ============================================================================
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
+    
+    # Single unified selector: Nitrate alone OR a layer with nitrate overlay
+    view_options = ["🧪 Nitrate Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
+    selected_view = st.selectbox("View:", view_options, key="layer_select")
+    
+    # Determine if we're viewing nitrate alone or a layer + nitrate
+    show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
+    
+    if show_nitrate_only:
+        # NITRATE ALONE: blank base map + nitrate points
+        m = folium.Map(
+            location=[11.5, 42.9],  # Djibouti center
+            zoom_start=12,
+            tiles="OpenStreetMap"
+        )
+        
+        if df_nitrate_points is not None and not df_nitrate_points.empty:
+            norm_yhat = Normalize(vmin=10, vmax=100)
+            m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+            st.success("✓ Nitrate measurements displayed", icon="🧪")
+        else:
+            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
+    else:
+        # LAYER + NITRATE: pick the selected layer and overlay nitrate
+        layer_idx = view_options.index(selected_view) - 1  # Offset by 1 (nitrate is first)
+        config = INPUT_LAYERS_CONFIG[layer_idx]
+        
+        st.info(f"**{config['title']}** | {config['units']}")
+        
+        if config['layer'] not in data_xr:
+            st.error(f"❌ Layer {config['layer']} not found in data")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        # Render the chosen layer
+        if config.get('categorical'):
+            # CLASS plotter
+            m = plot_class_layer(
+                data_xr, config['layer'],
+                class_colors=config['colors'], class_labels=config['legend'],
+                title=f"{config['title']} {config['units']}",
+                lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        else:
+            # CONTINUOUS plotter: resolve vmin/vmax
+            layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
+            vmin, vmax = config.get('vmin'), config.get('vmax')
+            
+            if vmin is None or vmax is None:
+                valid_data = layer_masked.compressed()
+                if len(valid_data) > 0:
+                    if vmin is None:
+                        vmin = np.quantile(valid_data, config['quantile_min']) if 'quantile_min' in config else float(valid_data.min())
+                    if vmax is None:
+                        vmax = np.quantile(valid_data, config['quantile_max']) if 'quantile_max' in config else float(valid_data.max())
+                else:
+                    vmin, vmax = vmin or 0, vmax or 1
+            
+            if vmin is None or vmax is None or vmin >= vmax:
+                valid_data = layer_masked.compressed()
+                if len(valid_data) > 0:
+                    vmin, vmax = float(np.nanmin(valid_data)), float(np.nanmax(valid_data))
+                else:
+                    vmin, vmax = 0, 1
+            
+            if vmin == vmax:
+                vmin, vmax = vmin - 0.5, vmax + 0.5
+            
+            norm_cont = (LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale')
+                         else Normalize(vmin=vmin, vmax=vmax))
+            
+            m = plot_continuous_layer(
+                data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
+                title=f"{config['title']} {config['units']}", units=config['units'],
+                lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        
+        # Always overlay nitrate when viewing a layer
+        if df_nitrate_points is not None and not df_nitrate_points.empty:
+            norm_yhat = Normalize(vmin=10, vmax=100)
+            m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+            st.success(f"✓ Nitrate overlaid on {config['layer'].upper()}", icon="🧪")
+        else:
+            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
+    
+    # Render map FULL-WIDTH as main figure
+    if m:
+        st_folium(m, width=1200, height=700, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
 
-    # Create 4x2 grid
-    for idx, config in enumerate(INPUT_LAYERS_CONFIG):
-        if idx % 2 == 0:
-            col1, col2 = st.columns(2)
 
-        col = col1 if idx % 2 == 0 else col2
-
-        with col:
-            st.subheader(f"{config['title']} {config['units']}")
-
-            if config['layer'] not in data_xr:
-                st.error(f"❌ Layer {config['layer']} not found")
-                continue
-
-            water_mask = _get_water_mask(data_xr)
-
-            if config.get('categorical'):
-                # CLASS plotter: legend lists every category name present
-                m = plot_class_layer(
-                    data_xr, config['layer'],
-                    class_colors=config['colors'], class_labels=config['legend'],
-                    title=f"{config['title']} {config['units']}",
-                    lat=lat_input, lon=lon_input, water_mask=water_mask
-                )
-            else:
-                # CONTINUOUS plotter: legend is a colorbar scale.
-                # vmin/vmax resolution below is UNCHANGED from the original logic
-                # (explicit config value > quantile > data min/max, with the same
-                # vmin>=vmax and vmin==vmax safety nets).
-                layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
-                vmin, vmax = config.get('vmin'), config.get('vmax')
-
-                if vmin is None or vmax is None:
-                    valid_data = layer_masked.compressed()
-                    if len(valid_data) > 0:
-                        if vmin is None:
-                            vmin = np.quantile(valid_data, config['quantile_min']) if 'quantile_min' in config else float(valid_data.min())
-                        if vmax is None:
-                            vmax = np.quantile(valid_data, config['quantile_max']) if 'quantile_max' in config else float(valid_data.max())
-                    else:
-                        vmin, vmax = vmin or 0, vmax or 1
-
-                if vmin is None or vmax is None or vmin >= vmax:
-                    valid_data = layer_masked.compressed()
-                    if len(valid_data) > 0:
-                        vmin, vmax = float(np.nanmin(valid_data)), float(np.nanmax(valid_data))
-                    else:
-                        vmin, vmax = 0, 1
-
-                if vmin == vmax:
-                    vmin, vmax = vmin - 0.5, vmax + 0.5
-
-                norm_cont = (LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale')
-                             else Normalize(vmin=vmin, vmax=vmax))
-
-                m = plot_continuous_layer(
-                    data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
-                    title=f"{config['title']} {config['units']}", units=config['units'],
-                    lat=lat_input, lon=lon_input, water_mask=water_mask
-                )
-
-            if m:
-                st_folium(m, width=300, height=300, key=f"input_{config['layer']}_{lat_input}_{lon_input}")
 
 # ============================================================================
-# TAB 1: RISK & PRIORITY MAPS
+# TAB 3: RISK & PRIORITY MAPS
 # ============================================================================
 with tab3:
-    st.header("Risk & Priority Assessment")
+    st.header("🗺️ Risk & Priority Assessment")
     
-    col1, col2 = st.columns(2)
+    # Selectbox to toggle between Risk and Priority
+    assessment_options = [
+        ("risk", "Contamination Risk (1–9)", 'risk_pdp_shap', risk_9_colors, RISK_LABELS),
+        ("priority", "Management Priority (1–4)", 'priority_zones_regulatory', priority_4_colors, PRIORITY_LABELS),
+    ]
     
-    with col1:
-        st.subheader("Contamination Risk (DRASTICLU, 1-9)")
-        risk_map = plot_class_layer(
-            data_xr, 'risk_pdp_shap',
-            class_colors=risk_9_colors, class_labels=RISK_LABELS,
-            title="Risk", lat=lat_input, lon=lon_input
-        )
-        if risk_map:
-            st_folium(risk_map, width=350, height=350, key=f"risk_map_{lat_input}_{lon_input}")
+    selected_assessment = st.selectbox("View:", [f"{opt[1]}" for opt in assessment_options], key="assessment_select")
+    assess_idx = next(i for i, opt in enumerate(assessment_options) if opt[1] == selected_assessment)
+    assess_layer = assessment_options[assess_idx]
     
-    with col2:
-        st.subheader("Management Priority (1-4)")
-        priority_map = plot_class_layer(
-            data_xr, 'priority_zones_regulatory',
-            class_colors=priority_4_colors, class_labels=PRIORITY_LABELS,
-            title="Priority", lat=lat_input, lon=lon_input
-        )
-        if priority_map:
-            st_folium(priority_map, width=350, height=350, key=f"priority_map_{lat_input}_{lon_input}")
+    st.info(f"**{assess_layer[1]}**")
+    
+    if assess_layer[2] not in data_xr:
+        st.error(f"❌ Layer {assess_layer[2]} not found")
+        st.stop()
+    
+    water_mask = _get_water_mask(data_xr)
+    
+    # Render the assessment map (both are categorical class layers)
+    m_assess = plot_class_layer(
+        data_xr, assess_layer[2],
+        class_colors=assess_layer[3], class_labels=assess_layer[4],
+        title=assess_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+    )
+    
+    if m_assess:
+        st_folium(m_assess, width=1200, height=700, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
+
 # ============================================================================
-# TAB 2: RIVER SHAP ATTRIBUTION MAPS
+# TAB 2: DRIVER ATTRIBUTION ANALYSIS
 # ============================================================================
 with tab2:
-    st.header("🎯 Driver Attribution Analysis (Rank & SHAP)")
-    
-    st.info("Top: Driver Rank (1-4) | Bottom: Driver SHAP values (1-4)")
+    st.header("🎯 Driver Attribution Analysis")
     
     # Verify driver layers exist (fail fast with one clear message)
     try:
@@ -804,7 +979,7 @@ with tab2:
     
     water_mask = _get_water_mask(data_xr)
     
-    # Driver colors
+    # Driver colors (DRASTICLU parameter palette)
     driver_colors = {
         0: parameters_8_colors[1],  # D
         1: parameters_8_colors[2],  # R
@@ -816,199 +991,178 @@ with tab2:
         7: parameters_8_colors[8],  # LU
     }
     
-    # ====== SECTION 1: DRIVER RANK (1-4) ======
-    st.subheader("📊 Driver Rank (Most Influential)")
+    # Two selectboxes: Attribution Type + Rank Number
+    col_type, col_rank = st.columns([1.5, 1])
+    with col_type:
+        attr_type = st.selectbox("Attribution Type:", ["Driver Rank", "Driver SHAP"], key="attr_type_select")
+    with col_rank:
+        rank_num = st.selectbox("Rank:", [1, 2, 3, 4], key="attr_rank_select")
     
-    col_map1, col_map2, col_legend1 = st.columns([1, 1, 0.6])
+    # Determine which layer to plot
+    if attr_type == "Driver Rank":
+        layer_name = f'driver_rank_{rank_num}'
+        title = f"Most Influential Parameter (Rank {rank_num})"
+    else:
+        layer_name = f'driver_shap_{rank_num}'
+        title = f"Top SHAP Contributor (Rank {rank_num})"
     
-    ranks_to_plot = [1, 2, 3, 4]
-    rank_positions = [
-        (col_map1, 1), (col_map2, 2),
-        (col_map1, 3), (col_map2, 4)
-    ]
+    st.info(f"**{title}**")
     
-    for rank, (col, pos) in zip(ranks_to_plot, rank_positions):
-        with col:
-            st.text(f"Rank {rank}", help=f"Driver ranking position {rank}")
-            # CLASS plotter (which DRASTICLU parameter dominates here) - shared
-            # legend column below, so the per-map legend is suppressed
-            m = plot_class_layer(
-                data_xr, f'driver_rank_{rank}',
-                class_colors=driver_colors, class_labels=DRIVER_MAP,
-                title=f"Rank {rank}", lat=lat_input, lon=lon_input,
-                water_mask=water_mask, figsize=(7, 7), show_legend=False
-            )
-            if m:
-                st_folium(m, width=300, height=300, key=f"driver_rank_{rank}_{lat_input}_{lon_input}")
+    # Render the driver attribution map
+    m_driver = plot_class_layer(
+        data_xr, layer_name,
+        class_colors=driver_colors, class_labels=DRIVER_MAP,
+        title=title, lat=lat_input, lon=lon_input,
+        water_mask=water_mask, figsize=(8, 8)
+    )
     
-    with col_legend1:
-        st.subheader("🎨 Legend", help="Parameter colors")
-        param_list = [
-            ('D', 'Depth', 1),
-            ('R', 'Recharge', 2),
-            ('A', 'Aquifer', 3),
-            ('S', 'Soil', 4),
-            ('T', 'Topography', 5),
-            ('I', 'Impact', 6),
-            ('C', 'Conductivity', 7),
-            ('LU', 'Land Use', 8),
-        ]
-        
-        for code, name, param_num in param_list:
-            color = parameters_8_colors[param_num]
-            st.markdown(
-                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 11px;">'
-                f'<b>{code}</b> {name}</div>',
-                unsafe_allow_html=True
-            )
+    if m_driver:
+        st_folium(m_driver, width=1200, height=700, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
     
+    # Legend
     st.markdown("---")
+    st.subheader("🎨 DRASTICLU Parameter Legend")
     
-    # ====== SECTION 2: DRIVER SHAP (1-4) ======
-    st.subheader("🔍 Driver SHAP Contribution (Top 4)")
+    col_leg1, col_leg2, col_leg3 = st.columns(3)
     
-    col_map3, col_map4, col_legend2 = st.columns([1, 1, 0.6])
-    
-    shap_ranks_to_plot = [1, 2, 3, 4]
-    shap_positions = [
-        (col_map3, 1), (col_map4, 2),
-        (col_map3, 3), (col_map4, 4)
+    param_list = [
+        ('D', 'Depth', 1),
+        ('R', 'Recharge', 2),
+        ('A', 'Aquifer', 3),
+        ('S', 'Soil', 4),
+        ('T', 'Topography', 5),
+        ('I', 'Impact', 6),
+        ('C', 'Conductivity', 7),
+        ('LU', 'Land Use', 8),
     ]
     
-    for shap_rank, (col, pos) in zip(shap_ranks_to_plot, shap_positions):
-        with col:
-            st.text(f"SHAP Rank {shap_rank}", help=f"SHAP contribution ranking {shap_rank}")
-            m = plot_class_layer(
-                data_xr, f'driver_shap_{shap_rank}',
-                class_colors=driver_colors, class_labels=DRIVER_MAP,
-                title=f"SHAP Rank {shap_rank}", lat=lat_input, lon=lon_input,
-                water_mask=water_mask, figsize=(7, 7), show_legend=False
-            )
-            if m:
-                st_folium(m, width=300, height=300, key=f"driver_shap_{shap_rank}_{lat_input}_{lon_input}")
-    
-    with col_legend2:
-        st.subheader("🎨 Legend", help="Parameter colors")
-        param_list = [
-            ('D', 'Depth', 1),
-            ('R', 'Recharge', 2),
-            ('A', 'Aquifer', 3),
-            ('S', 'Soil', 4),
-            ('T', 'Topography', 5),
-            ('I', 'Impact', 6),
-            ('C', 'Conductivity', 7),
-            ('LU', 'Land Use', 8),
-        ]
+    for idx, (code, name, param_num) in enumerate(param_list):
+        if idx < 3:
+            col = col_leg1
+        elif idx < 6:
+            col = col_leg2
+        else:
+            col = col_leg3
         
-        for code, name, param_num in param_list:
+        with col:
             color = parameters_8_colors[param_num]
             st.markdown(
-                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 11px;">'
+                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 10px;">'
                 f'<b>{code}</b> {name}</div>',
                 unsafe_allow_html=True
             )
 
 
 # ============================================================================
-# TAB 4: PREDICTION MAPS
+# TAB 4: PREDICTION MAPS — VULNERABILITY & CONCENTRATION
 # ============================================================================
 with tab1:
-    st.header("Prediction Maps")
+    st.header("📊 Prediction Maps: Vulnerability & Concentration")
     
-    # Toggle to show nitrate measurements
-    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
-  
-    col1, col2 = st.columns(2)
+    # Create two sub-tabs
+    sub_tab_vuln, sub_tab_conc = st.tabs(["🔴 Vulnerability", "🟠 Concentration"])
     
-    with col1:
-        # index_shap: continuous vulnerability index -> CONTINUOUS plotter
-        norm_shap = Normalize(vmin=80, vmax=200)
-        shap_map = plot_continuous_layer(data_xr, 'index_shap', cmap_vulnerability, norm_shap,
-                                          title=PREDICTION_TITLES['index_shap'],
-                                          lat=lat_input, lon=lon_input)
-        if shap_map:
-            st_folium(shap_map, width=350, height=350, key=f"shap_index_map_{lat_input}_{lon_input}")
+    # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
+    with sub_tab_vuln:
+        st.subheader("Groundwater Vulnerability Index (SHAP-based)")
+        
+        # Vulnerability layer options
+        vuln_options = [
+            ("index_shap", "Continuous Index (80–200)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
+            ("index_shap_std", "Uncertainty (12–26)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
+            ("index_shap_class", "5-Class (Low–Very High)", 'index_shap_class', None, None, "class"),
+            ("index_shap_entropy", "Entropy (0–1)", 'index_shap_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+        ]
+        
+        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
+        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
+        vuln_layer = vuln_options[vuln_idx]
+        
+        st.info(f"**{vuln_layer[1]}**")
+        
+        if vuln_layer[2] not in data_xr:
+            st.error(f"❌ Layer {vuln_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if vuln_layer[5] == "class":
+            # CLASS layer: index_shap_class
+            m_vuln = plot_class_layer(
+                data_xr, vuln_layer[2],
+                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        else:
+            # CONTINUOUS layers
+            m_vuln = plot_continuous_layer(
+                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        
+        if m_vuln:
+            st_folium(m_vuln, width=1200, height=700, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
     
-    with col2:
-        # index_shap_std: uncertainty (viridis) -> CONTINUOUS plotter
-        norm_shap_std = Normalize(vmin=12, vmax=26)
-        shap_std_map = plot_continuous_layer(data_xr, 'index_shap_std', cmap_std, norm_shap_std,
-                                              title=PREDICTION_TITLES['index_shap_std'],
-                                              lat=lat_input, lon=lon_input)
-        if shap_std_map:
-            st_folium(shap_std_map, width=350, height=350, key=f"shap_std_map_{lat_input}_{lon_input}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # index_shap_class: 5-class vulnerability -> CLASS plotter.
-        # FIX: previously routed through create_map_with_raster_overlay(), which
-        # only recognized layer_name == "Risk" and otherwise always plotted
-        # 'priority_zones_regulatory' - so this map was silently showing the
-        # Priority layer instead of index_shap_class. Naming the variable
-        # directly (as the continuous plotter already did) fixes it.
-        shap_class_map = plot_class_layer(
-            data_xr, 'index_shap_class',
-            class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
-            title=PREDICTION_TITLES['index_shap_class'], lat=lat_input, lon=lon_input
-        )
-        if shap_class_map:
-            st_folium(shap_class_map, width=350, height=350, key=f"shap_class_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # index_shap_entropy_norm: entropy (davos) -> CONTINUOUS plotter
-        norm_entropy = Normalize(vmin=0, vmax=1)
-        shap_entropy_map = plot_continuous_layer(data_xr, 'index_shap_entropy_norm', cmap_entropy, norm_entropy,
-                                                  title=PREDICTION_TITLES['index_shap_entropy_norm'],
-                                                  lat=lat_input, lon=lon_input)
-        if shap_entropy_map:
-            st_folium(shap_entropy_map, width=350, height=350, key=f"shap_entropy_map_{lat_input}_{lon_input}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # y_hat: continuous NO3 concentration -> CONTINUOUS plotter
-        norm_yhat = Normalize(vmin=10, vmax=100)
-        y_hat_map = plot_continuous_layer(data_xr, 'y_hat', cmap_nitrate, norm_yhat,
-                                           title=PREDICTION_TITLES['y_hat'],
-                                           lat=lat_input, lon=lon_input)
-        if y_hat_map and show_nitrate_points:
-            y_hat_map = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
+    # ========== SUB-TAB 2: CONCENTRATION MAPS ==========
+    with sub_tab_conc:
+        st.subheader("Predicted NO₃⁻ Concentration (mg/L)")
+        
+        # Concentration layer options
+        conc_options = [
+            ("y_hat", "Continuous Concentration (10–100)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
+            ("y_hat_residuals", "Residuals (Prediction Error)", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
+            ("y_hat_class", "Concentration Classes (Binned)", 'y_hat_log_class', None, None, "class"),
+            ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+        ]
+        
+        # Layer selector & controls
+        col_view, col_toggle = st.columns([2, 1])
+        with col_view:
+            selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="conc_map_select")
+        with col_toggle:
+            show_ground_truth = st.checkbox("📍 Ground Truth", value=True, key="show_gt_conc")
+        
+        conc_idx = next(i for i, opt in enumerate(conc_options) if opt[1] == selected_conc)
+        conc_layer = conc_options[conc_idx]
+        
+        st.info(f"**{conc_layer[1]}**")
+        
+        if conc_layer[2] not in data_xr:
+            st.error(f"❌ Layer {conc_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if conc_layer[5] == "class":
+            # CLASS layer: y_hat_log_class (binned concentration predictions)
+            m_conc = plot_class_layer(
+                data_xr, conc_layer[2],
+                class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+            # Overlay measurement ground truth classes (pre-calculated in df) if toggled on
+            if show_ground_truth and m_conc and df_nitrate_points is not None and not df_nitrate_points.empty:
+                m_conc = add_measurement_classes_layer(m_conc, df_nitrate_points, nitrate_5_colors, nitrate_class_labels)
+                st.success("✓ Ground truth classes overlaid", icon="🧪")
+        else:
+            # CONTINUOUS layers (concentration, residuals/error, entropy)
+            m_conc = plot_continuous_layer(
+                data_xr, conc_layer[2], cmap=conc_layer[3], norm=conc_layer[4],
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
             
-        if y_hat_map:
-            st_folium(y_hat_map, width=350, height=350, key=f"y_hat_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # y_hat_std: uncertainty (viridis) -> CONTINUOUS plotter
-        norm_yhat_std = Normalize(vmin=5, vmax=40)
-        y_hat_std_map = plot_continuous_layer(data_xr, 'y_hat_std', cmap_std, norm_yhat_std,
-                                               title=PREDICTION_TITLES['y_hat_std'],
-                                               lat=lat_input, lon=lon_input)
-        if y_hat_std_map:
-            st_folium(y_hat_std_map, width=350, height=350, key=f"y_hat_std_map_{lat_input}_{lon_input}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # y_hat_log_class: 5-class nitrate contamination -> CLASS plotter.
-        # Same fix as index_shap_class above - now reads its own variable
-        # instead of silently falling back to priority_zones_regulatory.
-        y_hat_class_map = plot_class_layer(
-            data_xr, 'y_hat_log_class',
-            class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
-            title=PREDICTION_TITLES['y_hat_log_class'], lat=lat_input, lon=lon_input
-        )
-        if y_hat_class_map:
-            st_folium(y_hat_class_map, width=350, height=350, key=f"y_hat_class_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # y_hat_log_entropy_norm: entropy (davos) -> CONTINUOUS plotter
-        norm_yhat_entropy = Normalize(vmin=0, vmax=1)
-        y_hat_entropy_map = plot_continuous_layer(data_xr, 'y_hat_log_entropy_norm', cmap_entropy, norm_yhat_entropy,
-                                                   title=PREDICTION_TITLES['y_hat_log_entropy_norm'],
-                                                   lat=lat_input, lon=lon_input)
-        if y_hat_entropy_map:
-            st_folium(y_hat_entropy_map, width=350, height=350, key=f"y_hat_entropy_map_{lat_input}_{lon_input}")
+            # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
+            if conc_layer[0] == "y_hat_residuals" and show_ground_truth and m_conc is not None:
+                if df_nitrate_points is not None and not df_nitrate_points.empty:
+                    norm_residuals = Normalize(vmin=-50, vmax=50)
+                    m_conc = add_measurement_residuals_layer(m_conc, df_nitrate_points, cmap_std, norm_residuals)
+                    st.success("✓ Ground truth residuals overlaid", icon="🧪")
+        
+        if m_conc:
+            st_folium(m_conc, width=1200, height=700, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+
+
+
 
 
 # ============================================================================
