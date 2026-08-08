@@ -23,7 +23,7 @@ st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
 # ============================================================================
 @st.cache_resource
 def load_data():
-    with open('douda_minimal.pkl', 'rb') as f:
+    with open('djibouti_data_minimal.pkl', 'rb') as f:
         data = pickle.load(f)
     return data
 
@@ -40,7 +40,7 @@ except FileNotFoundError:
 @st.cache_data
 def load_nitrate_points():
     try:
-        df_nitrate = pd.read_csv('douda_results.csv')
+        df_nitrate = pd.read_csv('lat_lon_d_n_data.csv')
         # Ensure column names are correct
         df_nitrate.columns = df_nitrate.columns.str.strip().str.lower()
         return df_nitrate
@@ -60,27 +60,29 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     """
     Overlay nitrate measurement points on folium map, colored by NO3 concentration.
     
-    Args:
-        m: folium.Map
-        df_nitrate: DataFrame with lat/lon/no3 columns (columns lowercase from load_nitrate_points)
-        cmap: matplotlib colormap
-        norm_obj: matplotlib norm (e.g. Normalize(vmin=10, vmax=100))
-        show_points: boolean to render points
-    
-    Returns:
-        Modified folium.Map with measurement points
+    Flexible column matching handles: NO3, no3, NO₃, nitrate, concentration
     """
     if not show_points or df_nitrate is None or df_nitrate.empty:
         return m
     
-    # Use flexible column name matching (same pattern as working functions)
+    # Create case-insensitive lookup
     col_names = {k.lower(): k for k in df_nitrate.columns}
+    
+    # Match coordinates
     lat_col = col_names.get('latitude') or col_names.get('lat')
     lon_col = col_names.get('longitude') or col_names.get('lon')
-    no3_col = col_names.get('NO3') or col_names.get('nitrate') or col_names.get('concentration')
     
-    # Return early if columns not found
+    # Match NO3 - try many variations (handles unicode, different spellings)
+    no3_col = (col_names.get('no3') or 
+               col_names.get('no₃') or  # Unicode subscript
+               col_names.get('nitrate') or 
+               col_names.get('concentration') or
+               col_names.get('n03'))  # Mistyped
+    
+    # Debug: if no3_col not found, show what we have
     if not all([lat_col, lon_col, no3_col]):
+        st.warning(f"⚠️ Missing columns for NO3 overlay: lat={lat_col}, lon={lon_col}, no3={no3_col}")
+        st.write(f"Available columns: {list(df_nitrate.columns)}")
         return m
     
     fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
@@ -214,7 +216,7 @@ def add_measurement_classes_layer(m, df_nitrate, class_colors, class_labels):
     col_names = {k.lower(): k for k in df_nitrate.columns}
     lat_col = col_names.get('latitude') or col_names.get('lat')
     lon_col = col_names.get('longitude') or col_names.get('lon')
-    class_col = col_names.get('y_cls') or col_names.get('predicted_class')
+    class_col = col_names.get('y_class') or col_names.get('predicted_class')
     
     if not all([lat_col, lon_col, class_col]):
         return m
@@ -251,7 +253,6 @@ def add_measurement_classes_layer(m, df_nitrate, class_colors, class_labels):
         fg_meas_classes.add_to(m)
     
     return m
-
 
 
 # ============================================================================
