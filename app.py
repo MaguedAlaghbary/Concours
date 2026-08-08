@@ -863,7 +863,7 @@ with tab_inputs:
     if show_nitrate_only:
         # NITRATE ALONE: blank base map + nitrate points
         m = folium.Map(
-            location=[11.5, 42.9],  # Djibouti center
+            location=[11.5, 43.1],  # Djibouti center
             zoom_start=11,
             tiles="OpenStreetMap"
         )
