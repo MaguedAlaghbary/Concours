@@ -797,7 +797,7 @@ with tab_inputs:
     
     # Render map FULL-WIDTH as main figure
     if m:
-        st_folium(m, width=1200, height=700, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
+        st_folium(m, width=900, height=500, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
 
 
 
