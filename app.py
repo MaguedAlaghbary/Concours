@@ -210,7 +210,7 @@ def add_measurement_classes_layer(m, df_nitrate, class_colors, class_labels):
     col_names = {k.lower(): k for k in df_nitrate.columns}
     lat_col = col_names.get('latitude') or col_names.get('lat')
     lon_col = col_names.get('longitude') or col_names.get('lon')
-    class_col = col_names.get('y_class') or col_names.get('predicted_class')
+    class_col = col_names.get('y_cls') or col_names.get('predicted_class')
     
     if not all([lat_col, lon_col, class_col]):
         return m
