@@ -253,61 +253,6 @@ def add_measurement_classes_layer(m, df_nitrate, class_colors, class_labels):
     return m
 
 
-    """
-    Add nitrate measurement points to folium map with color-coding by concentration.
-    Handles flexible column names (no3, NO3, nitrate, concentration, etc.)
-    """
-    if df_nitrate is None or not show_points or df_nitrate.empty:
-        return m
-    
-    # Identify column names (case-insensitive, handles variations)
-    col_names = {k.lower(): k for k in df_nitrate.columns}
-    
-    lat_col = col_names.get('latitude') or col_names.get('lat')
-    lon_col = col_names.get('longitude') or col_names.get('lon')
-    no3_col = col_names.get('no3') or col_names.get('nitrate') or col_names.get('concentration')
-    
-    if not all([lat_col, lon_col, no3_col]):
-        return m  # Silently return if columns not found
-    
-    fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
-    count = 0
-    
-    for idx, row in df_nitrate.iterrows():
-        try:
-            lon = float(row[lon_col])
-            lat = float(row[lat_col])
-            no3_val = float(row[no3_col])
-            
-            # Normalize and get color
-            normalized_val = norm_obj(no3_val)
-            rgba = cmap(normalized_val)
-            hex_color = '#{:02x}{:02x}{:02x}'.format(
-                int(rgba[0]*255), 
-                int(rgba[1]*255), 
-                int(rgba[2]*255)
-            )
-            
-            # Add circle marker
-            folium.CircleMarker(
-                location=[lat, lon],
-                radius=5,
-                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
-                color=hex_color,
-                fill=True,
-                fillColor=hex_color,
-                fillOpacity=0.8,
-                weight=1,
-                opacity=0.9
-            ).add_to(fg_nitrate)
-            count += 1
-        except (ValueError, TypeError, KeyError):
-            continue
-    
-    if count > 0:
-        fg_nitrate.add_to(m)
-    
-    return m
 
 # ============================================================================
 # DEFINE COLOR SCHEMES (EXACT from Douda notebook)
