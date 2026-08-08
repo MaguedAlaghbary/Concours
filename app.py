@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
-from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize
+from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize, LogNorm
 from io import BytesIO
 import base64
 import pickle
@@ -15,60 +15,131 @@ import pickle
 # PAGE CONFIG
 # ============================================================================
 st.set_page_config(page_title="Djibouti Aquifer Vulnerability", layout="wide")
-st.title("🗺️ Djibouti Nitrate Vulnerability Mapper")
-st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
 
 # ============================================================================
-# LOAD DATA
+# LOCATION SELECTOR (MUST BE BEFORE TITLE FOR EARLY REFERENCE)
+# ============================================================================
+st.sidebar.header("📍 Location Selection")
+selected_location = st.sidebar.radio(
+    "Choose Location:",
+    options=["Douda", "Bara"],
+    key="location_selector",
+    help="Switch between Douda and Bara regions"
+)
+
+st.sidebar.markdown("---")
+
+# Display title with selected location
+st.title(f"🗺️ Djibouti Nitrate Vulnerability Mapper - {selected_location}")
+st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
+st.info(f"📍 Currently viewing: **{selected_location.upper()}** region")
+
+# ============================================================================
+# LOAD DATA (TWO LOCATIONS)
 # ============================================================================
 @st.cache_resource
-def load_data():
-    with open('djibouti_data_minimal.pkl', 'rb') as f:
-        data = pickle.load(f)
-    return data
-
-try:
-    data_xr = load_data()
-    st.success("✅ Data loaded")
-except FileNotFoundError:
-    st.error("❌ Missing 'djibouti_data_minimal.pkl'")
-    st.stop()
-
-# ============================================================================
-# LOAD NITRATE MEASUREMENT POINTS
-# ============================================================================
-@st.cache_data
-def load_nitrate_points():
+def load_both_datasets():
+    """Load both Douda and Bara datasets"""
     try:
-        df_nitrate = pd.read_csv('lat_lon_d_n_data.csv')
-        # Ensure column names are correct
-        df_nitrate.columns = df_nitrate.columns.str.strip().str.lower()
-        return df_nitrate
+        with open('douda_minimal.pkl', 'rb') as f:
+            data_douda = pickle.load(f)
     except FileNotFoundError:
-        st.warning("⚠️ Nitrate measurements file not found: lat_lon_d_n_data.csv")
-        return None
-    except Exception as e:
-        st.warning(f"⚠️ Error loading nitrate data: {str(e)}")
-        return None
+        st.error("❌ Missing 'douda_minimal.pkl'")
+        st.stop()
+    
+    try:
+        with open('bara_minimal.pkl', 'rb') as f:
+            data_bara = pickle.load(f)
+    except FileNotFoundError:
+        st.error("❌ Missing 'bara_minimal.pkl'")
+        st.stop()
+    
+    return data_douda, data_bara
 
-df_nitrate_points = load_nitrate_points()
+@st.cache_data
+def load_both_measurements():
+    """Load both Douda and Bara measurements"""
+    try:
+        df_douda = pd.read_csv('douda_results.csv')
+        df_douda.columns = df_douda.columns.str.strip().str.lower()
+    except FileNotFoundError:
+        st.warning("⚠️ Nitrate measurements file not found: douda_results.csv")
+        df_douda = None
+    except Exception as e:
+        st.warning(f"⚠️ Error loading douda data: {str(e)}")
+        df_douda = None
+    
+    try:
+        df_bara = pd.read_csv('bara_results.csv')
+        df_bara.columns = df_bara.columns.str.strip().str.lower()
+    except FileNotFoundError:
+        st.warning("⚠️ Nitrate measurements file not found: bara_results.csv")
+        df_bara = None
+    except Exception as e:
+        st.warning(f"⚠️ Error loading bara data: {str(e)}")
+        df_bara = None
+    
+    return df_douda, df_bara
+
+# Load all data
+data_douda, data_bara = load_both_datasets()
+df_douda, df_bara = load_both_measurements()
+
+st.success("✅ Both locations loaded successfully")
+
+# ============================================================================
+# SELECT ACTIVE DATASET BASED ON LOCATION
+# ============================================================================
+if selected_location == "Douda":
+    data_xr = data_douda
+    df_nitrate_points = df_douda
+    location_name = "Douda"
+else:  # Bara
+    data_xr = data_bara
+    df_nitrate_points = df_bara
+    location_name = "Bara"
 
 # ============================================================================
 # FUNCTION TO ADD NITRATE POINTS TO FOLIUM MAP
 # ============================================================================
 def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
-    """Add nitrate measurement points as a folium FeatureGroup (toggleable)"""
-    if df_nitrate is None or not show_points:
+    """
+    Overlay nitrate measurement points on folium map, colored by NO3 concentration.
+    
+    Flexible column matching handles: NO3, no3, NO₃, nitrate, concentration
+    """
+    if not show_points or df_nitrate is None or df_nitrate.empty:
+        return m
+    
+    # Create case-insensitive lookup
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    
+    # Match coordinates
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    
+    # Match NO3 - try many variations (handles unicode, different spellings)
+    no3_col = (col_names.get('NO3') or 
+               col_names.get('no3') or 
+               col_names.get('no₃') or  # Unicode subscript
+               col_names.get('nitrate') or 
+               col_names.get('concentration') or
+               col_names.get('n03'))  # Mistyped
+    
+    # Debug: if no3_col not found, show what we have
+    if not all([lat_col, lon_col, no3_col]):
+        st.warning(f"⚠️ Missing columns for NO3 overlay: lat={lat_col}, lon={lon_col}, no3={no3_col}")
+        st.write(f"Available columns: {list(df_nitrate.columns)}")
         return m
     
     fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
+    count = 0
     
-    # Get colormap RGBA values
     for idx, row in df_nitrate.iterrows():
         try:
-            lon = float(row['longitude'])
-            lat = float(row['latitude'])
-            no3_val = float(row['no3'])  # or 'NO3' or 'nitrate' depending on column name
+            lat = float(row[lat_col])
+            lon = float(row[lon_col])
+            no3_val = float(row[no3_col])
             
             # Normalize and get color
             normalized_val = norm_obj(no3_val)
@@ -79,23 +150,157 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
                 int(rgba[2]*255)
             )
             
+            # Add circle marker - make it visible with black border
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                popup=f"<b>NO₃⁻: {no3_val:.1f} mg/L</b><br>{lat:.4f}°N, {lon:.4f}°E",
+                tooltip=f"NO₃: {no3_val:.1f}",
+                color='black',  # Black border for contrast
+                fillColor=hex_color,
+                fill=True,
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
+            ).add_to(fg_nitrate)
+            count += 1
+        except (ValueError, TypeError, KeyError):
+            continue
+    
+    # Only add layer if we have points
+    if count > 0:
+        fg_nitrate.add_to(m)
+    
+    return m
+
+
+def add_measurement_residuals_layer(m, df_nitrate, cmap, norm_obj):
+    """
+    Overlay measurement residuals (pre-calculated in df) as colored points.
+    
+    Assumes df_nitrate has columns:
+        - latitude, longitude: measurement locations
+        - residual: pre-calculated error (actual - predicted)
+    
+    Args:
+        m: folium.Map
+        df_nitrate: DataFrame with lat/lon/residual columns
+        cmap: matplotlib colormap (e.g., diverging blue-red)
+        norm_obj: matplotlib norm (e.g., Normalize(vmin=-50, vmax=50))
+    
+    Returns:
+        Modified folium.Map with measurement residual points
+    """
+    if df_nitrate is None or df_nitrate.empty:
+        return m
+    
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    residual_col = col_names.get('residual') or col_names.get('error')
+    
+    if not all([lat_col, lon_col, residual_col]):
+        return m
+    
+    fg_residuals = folium.FeatureGroup(name='🧪 Measurement Residuals (Actual − Predicted)', show=True)
+    count = 0
+    
+    for idx, row in df_nitrate.iterrows():
+        try:
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            residual_val = float(row[residual_col])
+            
+            # Normalize residual and get color
+            normalized_residual = norm_obj(residual_val)
+            rgba = cmap(normalized_residual)
+            hex_color = '#{:02x}{:02x}{:02x}'.format(
+                int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255)
+            )
+            
             # Add circle marker
             folium.CircleMarker(
                 location=[lat, lon],
                 radius=6,
-                popup=f"NO₃⁻: {no3_val:.1f} mg/L<br>Lat: {lat:.4f}°<br>Lon: {lon:.4f}°",
+                popup=f"Error: {residual_val:+.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
                 color=hex_color,
                 fill=True,
                 fillColor=hex_color,
-                fillOpacity=0.8,
-                weight=1,
-                opacity=0.9
-            ).add_to(fg_nitrate)
-        except (ValueError, KeyError) as e:
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
+            ).add_to(fg_residuals)
+            count += 1
+        except (ValueError, TypeError, KeyError):
             continue
     
-    fg_nitrate.add_to(m)
+    if count > 0:
+        fg_residuals.add_to(m)
+    
     return m
+
+
+def add_measurement_classes_layer(m, df_nitrate, class_colors, class_labels):
+    """
+    Overlay measurement binned classes (pre-calculated in df) as colored points.
+    
+    Assumes df_nitrate has columns:
+        - latitude, longitude: measurement locations
+        - y_class or predicted_class: pre-calculated class number (1-5)
+    
+    Args:
+        m: folium.Map
+        df_nitrate: DataFrame with lat/lon/y_class columns
+        class_colors: dict mapping class number → hex color
+        class_labels: dict mapping class number → label string
+    
+    Returns:
+        Modified folium.Map with measurement class points
+    """
+    if df_nitrate is None or df_nitrate.empty:
+        return m
+    
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    class_col = col_names.get('y_cls') or col_names.get('predicted_class')
+    
+    if not all([lat_col, lon_col, class_col]):
+        return m
+    
+    fg_meas_classes = folium.FeatureGroup(name='🧪 Measurement Classes (Ground Truth)', show=True)
+    count = 0
+    
+    for idx, row in df_nitrate.iterrows():
+        try:
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            class_num = int(row[class_col])
+            
+            label = class_labels.get(class_num, str(class_num))
+            color = class_colors.get(class_num, '#cccccc')
+            
+            # Add circle marker
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                popup=f"Class: {class_num} ({label})<br>{lat:.4f}°N, {lon:.4f}°E",
+                color=color,
+                fill=True,
+                fillColor=color,
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
+            ).add_to(fg_meas_classes)
+            count += 1
+        except (ValueError, TypeError, KeyError):
+            continue
+    
+    if count > 0:
+        fg_meas_classes.add_to(m)
+    
+    return m
+
 
 # ============================================================================
 # DEFINE COLOR SCHEMES (EXACT from Douda notebook)
@@ -174,24 +379,12 @@ priority_4_colors = {
     4: '#B2182B',  # Very High Risk - Dark red
 }
 
-# SHAP Index - Continuous (blue-red)
-shap_class_colors = {
-    1: '#053061',
-    2: '#2166AC',
-    3: '#4393C3',
-    4: '#F4A582',
-    5: '#B2182B'
-}
-
-
-# Create colormaps (EXACT from notebook)
-risk_ids = sorted(risk_9_colors.keys())
-cmap_risk = ListedColormap([risk_9_colors[k] for k in risk_ids])
-norm_risk = BoundaryNorm(np.arange(0.5, 9.5, 1), cmap_risk.N)
-
-priority_ids = sorted(priority_4_colors.keys())
-cmap_priority = ListedColormap([priority_4_colors[k] for k in priority_ids])
-norm_priority = BoundaryNorm(np.arange(0.5, 5.5, 1), cmap_priority.N)
+# NOTE: cmap/norm for every class layer (Risk, Priority, defuzzified classes,
+# DRASTICLU categorical inputs, driver rank/SHAP) are now derived automatically
+# inside plot_class_layer() from the *_colors dicts above + the codes actually
+# present in the data. This removes a prior off-by-one BoundaryNorm bug (the
+# top class in Risk/vulnerability/nitrate never got its own color bin) and a
+# separate misalignment bug for non-contiguous codes (e.g. land-cover 10..100).
 
 # ============================================================================
 # LABELS
@@ -434,11 +627,12 @@ INPUT_LAYERS_CONFIG = [
 ]
 
 
-
+width, height = 900, 600
 # ============================================================================
 # SIDEBAR: LOCATION INPUT
 # ============================================================================
 st.sidebar.header("📍 Query Location")
+st.sidebar.caption(f"🗺️ Region: **{location_name.upper()}**")
 
 col1, col2 = st.sidebar.columns(2)
 with col1:
@@ -446,7 +640,7 @@ with col1:
 with col2:
     lon_input = st.number_input("Longitude", min_value=41.7, max_value=43.4, value=42.9, step=0.01, key="lon_slider")
 
-st.sidebar.info(f"**Selected:** {lat_input:.3f}°N, {lon_input:.3f}°E")
+st.sidebar.info(f"**Selected:** {lat_input:.3f}°N, {lon_input:.3f}°E\n**in {location_name}**")
 
 # ============================================================================
 # FUNCTION: Extract values at point
@@ -466,271 +660,221 @@ def extract_at_point(lat, lon, data_xr, vars_list):
     return results
 
 # ============================================================================
-# FUNCTION: Create map with raster overlay (Risk & Priority)
+# SHARED RENDERING HELPERS (used by both plotters below)
 # ============================================================================
-# ============================================================================
-# FUNCTION: Create map with raster overlay (Risk & Priority - NO COLORBAR)
-# ============================================================================
-def create_map_with_raster_overlay(lat, lon, data_xr, layer_name, cmap_obj, norm, label_dict, color_dict):
-    """Create folium map with raster data overlay + selected point (LEGEND ONLY)"""
-    
-    # Get data
-    if layer_name == "Risk":
-        raster_data = data_xr['risk_pdp_shap'].values
-    else:
-        raster_data = data_xr['priority_zones_regulatory'].values
-    
-    # Water mask
-    lu_data = data_xr['LU'].values
-    water_mask = (lu_data == 80)
-    
+def _get_water_mask(data_xr):
+    """Boolean mask of water-covered pixels (LU == 80), blanked out on every map."""
+    return data_xr['LU'].values == 80
+
+
+def _get_domain_bounds(data_xr):
     lats = data_xr['latitude'].values
     lons = data_xr['longitude'].values
-    
-    lat_min, lat_max = lats.min(), lats.max()
-    lon_min, lon_max = lons.min(), lons.max()
-    
-    # Create figure (NO padding)
-    fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
+    return lats.min(), lats.max(), lons.min(), lons.max()
+
+
+def _fig_to_base64(fig, **savefig_kwargs):
+    """Render a matplotlib figure to a base64 PNG string and close it."""
+    buf = BytesIO()
+    fig.savefig(buf, format='png', **savefig_kwargs)
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode()
+    plt.close(fig)
+    return b64
+
+
+def _render_raster_png(raster_2d, water_mask, lon_min, lon_max, lat_min, lat_max,
+                        cmap, norm, figsize=(8, 8), dpi=100):
+    """Draw a masked raster with no axes/padding, return (base64_png, masked_array)."""
+    raster_masked = np.ma.masked_where(water_mask, raster_2d)
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi, facecolor='none')
     fig.patch.set_alpha(0)
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
     ax.patch.set_alpha(0)
-    
-    # Mask water
-    raster_masked = np.ma.masked_where(water_mask, raster_data)
-    
-    # Plot (NO COLORBAR)
-    im = ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                   cmap=cmap_obj, norm=norm, origin='lower', alpha=0.9, 
-                   interpolation='nearest')
-    
-    ax.set_xlabel("")
-    ax.set_ylabel("")
-    ax.set_title("")
+    ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
+              cmap=cmap, norm=norm, origin='lower', alpha=0.9, interpolation='nearest')
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xlim([lon_min, lon_max])
     ax.set_ylim([lat_min, lat_max])
-    
-    # Remove all padding
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
-    
-    # Save as PNG
-    img_buffer = BytesIO()
-    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, 
-                facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
-    img_buffer.seek(0)
-    img_base64 = base64.b64encode(img_buffer.read()).decode()
-    plt.close()
-    
-    # Create map
+    img_b64 = _fig_to_base64(fig, bbox_inches='tight', dpi=dpi, facecolor='none',
+                              edgecolor='none', transparent=True, pad_inches=0)
+    return img_b64, raster_masked
+
+
+def _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64,
+                           lat, lon, marker_color, popup_text, marker_radius=6):
+    """Folium map + raster ImageOverlay + a CircleMarker at the queried point."""
     m = folium.Map(
         location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-        zoom_start=10,
+        zoom_start=11,
         tiles="OpenStreetMap"
     )
-    
-    # Overlay (exact bounds match)
-    img_url = f"data:image/png;base64,{img_base64}"
     folium.raster_layers.ImageOverlay(
-        image=img_url,
+        image=f"data:image/png;base64,{img_b64}",
         bounds=[[lat_min, lon_min], [lat_max, lon_max]],
         opacity=0.85,
         interactive=True,
         cross_origin=False
     ).add_to(m)
-    
-    # Get value at point
-    if layer_name == "Risk":
-        layer_key = 'risk_pdp_shap'
-    else:
-        layer_key = 'priority_zones_regulatory'
-    
-    try:
-        selected_value = int(float(data_xr[layer_key].sel(latitude=lat, longitude=lon, method='nearest').values))
-        selected_value = max(1, min(selected_value, len(color_dict)))
-    except:
-        selected_value = 1
-    
-    # Marker color
-    marker_color = color_dict.get(selected_value, 'red')
-    
-    # Add marker
     folium.CircleMarker(
         location=[lat, lon],
-        radius=4,
-        popup=f"<b>{layer_name}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {selected_value}",
+        radius=marker_radius,
+        popup=popup_text,
         color=marker_color,
         fill=True,
         fillColor=marker_color,
         fillOpacity=0.95,
         weight=2
     ).add_to(m)
-    
-    # Legend ONLY (no colorbar)
-    legend_html = f'''
-    <div style="position: fixed; 
-                top: 10px; right: 10px; width: 160px; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:9px;
-                border-radius: 5px; padding: 8px; font-weight: bold;">
-    {layer_name}<br>
-    '''
-    
-    for i in sorted(color_dict.keys()):
-        label = label_dict.get(i, str(i))
-        legend_html += f'<div style="margin: 2px 0;"><i style="background:{color_dict[i]}; width: 12px; height: 12px; float: left; margin-right: 5px; border-radius: 1px; display: inline-block;"></i>{label}</div>'
-    
-    legend_html += '</div>'
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
     return m
 
+
+def _class_cmap_norm(class_colors, present_values):
+    """
+    Build a ListedColormap + BoundaryNorm that gives each ACTUAL present code its
+    own bin, using midpoints between the sorted present codes as bin edges.
+
+    This replaces two bugs in the previous hand-rolled BoundaryNorm calls:
+      1. Off-by-one boundary count (e.g. BoundaryNorm(np.arange(0.5, 9.5, 1), 9) for
+         Risk only defines 8 bins for 9 classes, so class 9 "Very High" silently
+         reused class 8's color). Building boundaries from the data guarantees the
+         correct count every time.
+      2. Position/value mismatch for non-contiguous codes (e.g. land-cover codes
+         10, 20, ..., 100): a fixed-step norm assuming codes are 0..n-1 puts almost
+         every pixel in the same "overflow" bin. Using the real codes' midpoints
+         fixes this regardless of spacing or sign (handles -1 "Merged" codes too).
+    """
+    present = sorted(present_values)
+    colors = [class_colors.get(v, '#cccccc') for v in present]
+    cmap = ListedColormap(colors)
+    if len(present) == 1:
+        boundaries = [present[0] - 0.5, present[0] + 0.5]
+    else:
+        mids = [(a + b) / 2 for a, b in zip(present[:-1], present[1:])]
+        lo = present[0] - (mids[0] - present[0])
+        hi = present[-1] + (present[-1] - mids[-1])
+        boundaries = [lo] + mids + [hi]
+    norm = BoundaryNorm(boundaries, cmap.N)
+    return cmap, norm, present
+
+
 # ============================================================================
-# FUNCTION: Create prediction map with CORRECT RANGES & LABELS
+# PLOTTER 1 of 2 — CONTINUOUS layers: raster overlay + a colorbar SCALE
 # ============================================================================
-def create_prediction_map(lat, lon, data_xr, layer_name, cmap_obj, norm_obj=None, title="", class_labels=None):
-    """Create folium map for prediction layers with correct vmin/vmax"""
-    
+def plot_continuous_layer(data_xr, var_name, cmap, norm, title, lat, lon,
+                           units="", water_mask=None, marker_color='red', figsize=(8, 8)):
+    """
+    Render a continuous (float-valued) raster layer as a folium map.
+
+    cmap/norm are supplied by the CALLER (e.g. Normalize(vmin=..., vmax=...) or
+    LogNorm(...)) so every value range chosen per-variable is preserved exactly.
+    The legend rendered is a colorbar SCALE — no discrete class list.
+    """
     try:
-        raster_data = data_xr[layer_name].values
-    except:
+        raster_data = data_xr[var_name].values
+    except KeyError:
         return None
-    
-    lu_data = data_xr['LU'].values
-    water_mask = (lu_data == 80)
-    
-    lats = data_xr['latitude'].values
-    lons = data_xr['longitude'].values
-    
-    lat_min, lat_max = lats.min(), lats.max()
-    lon_min, lon_max = lons.min(), lons.max()
-    
-    raster_masked = np.ma.masked_where(water_mask, raster_data)
-    
-    # Create main map figure
-    fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
-    fig.patch.set_alpha(0)
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.patch.set_alpha(0)
-    
-    # Plot with normalization
-    if norm_obj is not None:
-        im = ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                       cmap=cmap_obj, norm=norm_obj, origin='lower', alpha=0.9,
-                       interpolation='nearest')
-    else:
-        im = ax.imshow(raster_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                       cmap=cmap_obj, origin='lower', alpha=0.9,
-                       interpolation='nearest')
-    
-    ax.set_xlabel("")
-    ax.set_ylabel("")
-    ax.set_title("")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlim([lon_min, lon_max])
-    ax.set_ylim([lat_min, lat_max])
-    
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
-    
-    img_buffer = BytesIO()
-    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100, 
-                facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
-    img_buffer.seek(0)
-    img_base64 = base64.b64encode(img_buffer.read()).decode()
-    plt.close()
-    
-    # Create VERY SMALL horizontal colorbar
-    fig_cbar, ax_cbar = plt.subplots(figsize=(1.8, 0.25), dpi=80)
-    if norm_obj is not None:
-        cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_obj, cmap=cmap_obj), 
-                           cax=ax_cbar, orientation='horizontal', pad=0.01)
-    else:
-        vmin = np.nanmin(raster_masked)
-        vmax = np.nanmax(raster_masked)
-        norm_cont = Normalize(vmin=vmin, vmax=vmax)
-        cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_cont, cmap=cmap_obj), 
-                           cax=ax_cbar, orientation='horizontal', pad=0.01)
-    
+
+    if water_mask is None:
+        water_mask = _get_water_mask(data_xr)
+    lat_min, lat_max, lon_min, lon_max = _get_domain_bounds(data_xr)
+
+    img_b64, _ = _render_raster_png(raster_data, water_mask, lon_min, lon_max,
+                                     lat_min, lat_max, cmap, norm, figsize=figsize)
+
+    # Small horizontal colorbar image = the "scale" legend for this layer
+    cbar_fig, cbar_ax = plt.subplots(figsize=(1.8, 0.25), dpi=80)
+    cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap),
+                         cax=cbar_ax, orientation='horizontal', pad=0.01)
     cbar.ax.tick_params(labelsize=6)
-    
-    cbar_buffer = BytesIO()
-    plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
-                facecolor='white', transparent=False, pad_inches=0.02)
-    cbar_buffer.seek(0)
-    cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
-    plt.close()
-    
-    # Create folium map
-    m = folium.Map(
-        location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-        zoom_start=10,
-        tiles="OpenStreetMap"
-    )
-    
-    # Overlay
-    img_url = f"data:image/png;base64,{img_base64}"
-    folium.raster_layers.ImageOverlay(
-        image=img_url,
-        bounds=[[lat_min, lon_min], [lat_max, lon_max]],
-        opacity=0.85,
-        interactive=True,
-        cross_origin=False
-    ).add_to(m)
-    
-    # Marker
+    cbar_b64 = _fig_to_base64(cbar_fig, bbox_inches='tight', dpi=80,
+                               facecolor='white', transparent=False, pad_inches=0.02)
+
     try:
-        selected_value = float(data_xr[layer_name].sel(latitude=lat, longitude=lon, method='nearest').values)
-        # For class labels, show the class name
-        if class_labels and selected_value in class_labels:
-            value_str = f"{int(selected_value)} ({class_labels[int(selected_value)]})"
-        else:
-            value_str = f"{selected_value:.3f}"
-    except:
-        selected_value = np.nan
+        point_val = float(data_xr[var_name].sel(latitude=lat, longitude=lon, method='nearest').values)
+        value_str = f"{point_val:.3f}{(' ' + units) if units else ''}"
+    except Exception:
         value_str = "N/A"
-    
-    folium.CircleMarker(
-        location=[lat, lon],
-        radius=6,
-        popup=f"<b>{title}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {value_str}",
-        color='red',
-        fill=True,
-        fillColor='red',
-        fillOpacity=0.95,
-        weight=2
-    ).add_to(m)
-    
-    # Legend with tiny horizontal colorbar and class labels
+
+    popup_text = f"<b>{title}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Value: {value_str}"
+    m = _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64, lat, lon,
+                               marker_color, popup_text)
+
     legend_html = f'''
-    <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
-                background-color: white; border:2px solid #333; z-index:9999; 
+    <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+                background-color: white; border:2px solid #333; z-index:9999;
                 border-radius: 3px; padding: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
     <div style="font-size: 10px; font-weight: bold; text-align: center; margin-bottom: 4px;">{title}</div>
-    <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto; display: block; margin: 0 auto 4px;">
-    '''
-    
-    # Add class labels if provided (only for categorical maps)
-    # Add class labels if provided (only for categorical maps - show names only)
-    if class_labels:
-        legend_html += '<div style="font-size: 8px; border-top: 1px solid #ddd; padding-top: 4px; margin-top: 2px; line-height: 1.4;">'
-        for class_num in sorted(class_labels.keys()):
-            legend_html += f'<div style="margin: 1px 0;">{class_labels[class_num]}</div>'
-        legend_html += '</div>'
-    
-    legend_html += '</div>'
-
-    
+    <img src="data:image/png;base64,{cbar_b64}" style="width: 160px; height: auto; display: block; margin: 0 auto;">
+    </div>'''
     m.get_root().html.add_child(folium.Element(legend_html))
-    
+    return m
+
+
+# ============================================================================
+# PLOTTER 2 of 2 — CLASS layers: raster overlay + a swatch+label LEGEND
+# ============================================================================
+def plot_class_layer(data_xr, var_name, class_colors, class_labels, title, lat, lon,
+                      water_mask=None, figsize=(8, 8), show_legend=True):
+    """
+    Render a categorical (integer-coded) raster layer as a folium map.
+
+    class_colors/class_labels map the RAW codes stored in data_xr[var_name] to a
+    color and a human-readable name. cmap/norm are DERIVED here (not passed in)
+    via _class_cmap_norm so every class is guaranteed a correctly-bounded bin —
+    see _class_cmap_norm's docstring for the two bugs this avoids. The legend
+    lists every class actually present in the layer, by name (not a colorbar).
+    """
+    try:
+        raster_data = data_xr[var_name].values
+    except KeyError:
+        return None
+
+    if water_mask is None:
+        water_mask = _get_water_mask(data_xr)
+    lat_min, lat_max, lon_min, lon_max = _get_domain_bounds(data_xr)
+
+    present_preview = np.ma.masked_where(water_mask, raster_data)
+    present_values = np.unique(present_preview.compressed()).astype(int).tolist()
+    if not present_values:
+        present_values = [0]
+    cmap, norm, present = _class_cmap_norm(class_colors, present_values)
+
+    img_b64, _ = _render_raster_png(raster_data, water_mask, lon_min, lon_max,
+                                     lat_min, lat_max, cmap, norm, figsize=figsize)
+
+    try:
+        raw_val = data_xr[var_name].sel(latitude=lat, longitude=lon, method='nearest').values
+        selected_value = int(float(raw_val))
+        label = class_labels.get(selected_value, str(selected_value))
+    except Exception:
+        selected_value = None
+        label = "N/A"
+    marker_color = class_colors.get(selected_value, 'red')
+    popup_text = f"<b>{title}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Class: {selected_value} ({label})"
+
+    m = _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64, lat, lon,
+                               marker_color, popup_text, marker_radius=4)
+
+    if show_legend:
+        legend_html = f'''
+        <div style="position: fixed; top: 10px; right: 10px; width: 170px;
+                    background-color: white; border:2px solid grey; z-index:9999; font-size:9px;
+                    border-radius: 5px; padding: 8px; font-weight: bold;">
+        {title}<br>'''
+        for k in present:
+            lbl = class_labels.get(k, str(k))
+            color = class_colors.get(k, '#cccccc')
+            legend_html += (f'<div style="margin: 2px 0; font-weight: normal;">'
+                             f'<i style="background:{color}; width: 12px; height: 12px; '
+                             f'float: left; margin-right: 5px; border-radius: 1px; '
+                             f'display: inline-block;"></i>{lbl}</div>')
+        legend_html += '</div>'
+        m.get_root().html.add_child(folium.Element(legend_html))
+
     return m
 
 # ============================================================================
@@ -756,233 +900,151 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
-    # Create 4x2 grid
-    for idx, config in enumerate(INPUT_LAYERS_CONFIG):
-        if idx % 2 == 0:
-            col1, col2 = st.columns(2)
+    # Single unified selector: Nitrate alone OR a layer with nitrate overlay
+    view_options = ["🧪 Nitrate Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
+    selected_view = st.selectbox("View:", view_options, key="layer_select")
+    
+    # Determine if we're viewing nitrate alone or a layer + nitrate
+    show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
+    
+    if show_nitrate_only:
+        # NITRATE ALONE: blank base map + nitrate points
+        m = folium.Map(
+            location=[11.5, 43.1],  # Djibouti center
+            zoom_start=11,
+            tiles="OpenStreetMap"
+        )
         
-        col = col1 if idx % 2 == 0 else col2
+        if df_nitrate_points is not None and not df_nitrate_points.empty:
+            norm_yhat = Normalize(vmin=10, vmax=100)
+            m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+            folium.LayerControl().add_to(m)  # Add layer control AFTER adding layers
+            st.success("✓ Nitrate measurements displayed", icon="🧪")
+        else:
+            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
+    else:
+        # LAYER + NITRATE: pick the selected layer and overlay nitrate
+        layer_idx = view_options.index(selected_view) - 1  # Offset by 1 (nitrate is first)
+        config = INPUT_LAYERS_CONFIG[layer_idx]
         
-        with col:
-            st.subheader(f"{config['title']} {config['units']}")
-            
-            # Get data
-            try:
-                layer_data = data_xr[config['layer']].values
-            except:
-                st.error(f"❌ Layer {config['layer']} not found")
-                continue
-            
-            # Mask water
-            lu_data = data_xr['LU'].values
-            water_mask = (lu_data == 80)
-            layer_masked = np.ma.masked_where(water_mask, layer_data)
-            
-            lats = data_xr['latitude'].values
-            lons = data_xr['longitude'].values
-            lat_min, lat_max = lats.min(), lats.max()
-            lon_min, lon_max = lons.min(), lons.max()
-            
-            # Create figure
-            fig, ax = plt.subplots(figsize=(8, 8), dpi=100, facecolor='none')
-            fig.patch.set_alpha(0)
-            
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['bottom'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.patch.set_alpha(0)
-            
-            # Plot continuous or categorical
-            if config.get('categorical'):
-                # Categorical colormap - simple approach
-                unique_vals = sorted(np.unique(layer_masked.compressed()))
-                n_colors = len(unique_vals)
-                cat_colors = [config['colors'].get(int(v), '#cccccc') for v in unique_vals]
-                cat_cmap = ListedColormap(cat_colors)
-                norm_cat = BoundaryNorm(np.arange(-0.5, n_colors+0.5, 1), n_colors)
-                im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                              cmap=cat_cmap, norm=norm_cat, origin='lower', alpha=0.9,
-                              interpolation='nearest')
-                
-            else:
-                # Continuous colormap
-                vmin = config.get('vmin')
-                vmax = config.get('vmax')
-                
-                # Calculate vmin/vmax from quantiles if not set
-                if vmin is None or vmax is None:
-                    try:
-                        valid_data = layer_masked.compressed()
-                        if len(valid_data) > 0:
-                            if vmin is None and 'quantile_min' in config:
-                                vmin = np.quantile(valid_data, config['quantile_min'])
-                            if vmax is None and 'quantile_max' in config:
-                                vmax = np.quantile(valid_data, config['quantile_max'])
-                            if vmin is None:
-                                vmin = valid_data.min()
-                            if vmax is None:
-                                vmax = valid_data.max()
-                    except:
-                        vmin = vmin or 0
-                        vmax = vmax or 1
-                
-                # Ensure vmin < vmax
-                if vmin is None or vmax is None or vmin >= vmax:
-                    valid_data = layer_masked.compressed()
-                    if len(valid_data) > 0:
-                        vmin = float(np.nanmin(valid_data))
-                        vmax = float(np.nanmax(valid_data))
-                    else:
-                        vmin = 0
-                        vmax = 1
-                
-                if vmin == vmax:
-                    vmin = vmin - 0.5
-                    vmax = vmax + 0.5
-                
-                if config.get('log_scale'):
-                    from matplotlib.colors import LogNorm
-                    norm_cont = LogNorm(vmin=max(vmin, 0.01), vmax=vmax)
-                else:
-                    norm_cont = Normalize(vmin=vmin, vmax=vmax)
-                
-                im = ax.imshow(layer_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                              cmap=config['cmap'], norm=norm_cont, origin='lower', alpha=0.9,
-                              interpolation='nearest')
-            
-            ax.set_xticks([])
-            ax.set_yticks([])
-            ax.set_xlim([lon_min, lon_max])
-            ax.set_ylim([lat_min, lat_max])
-            
-            plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
-            
-            # Save as PNG
-            img_buffer = BytesIO()
-            plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
-                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
-            img_buffer.seek(0)
-            img_base64 = base64.b64encode(img_buffer.read()).decode()
-            plt.close()
-            
-            # Create horizontal colorbar for legend
-            fig_cbar, ax_cbar = plt.subplots(figsize=(1.8, 0.25), dpi=80)
-            if config.get('categorical'):
-                cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_cat, cmap=cat_cmap), 
-                                   cax=ax_cbar, orientation='horizontal', pad=0.01)
-            else:
-                cbar = plt.colorbar(plt.cm.ScalarMappable(norm=norm_cont, cmap=config['cmap']), 
-                                   cax=ax_cbar, orientation='horizontal', pad=0.01)
-            cbar.ax.tick_params(labelsize=6)
-            
-            cbar_buffer = BytesIO()
-            plt.savefig(cbar_buffer, format='png', bbox_inches='tight', dpi=80,
-                        facecolor='white', transparent=False, pad_inches=0.02)
-            cbar_buffer.seek(0)
-            cbar_base64 = base64.b64encode(cbar_buffer.read()).decode()
-            plt.close()
-            
-            # Create folium map
-            m = folium.Map(
-                location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-                zoom_start=10,
-                tiles="OpenStreetMap"
+        st.info(f"**{config['title']}** | {config['units']}")
+        
+        if config['layer'] not in data_xr:
+            st.error(f"❌ Layer {config['layer']} not found in data")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        # Render the chosen layer
+        if config.get('categorical'):
+            # CLASS plotter
+            m = plot_class_layer(
+                data_xr, config['layer'],
+                class_colors=config['colors'], class_labels=config['legend'],
+                title=f"{config['title']} {config['units']}",
+                lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
+        else:
+            # CONTINUOUS plotter: resolve vmin/vmax
+            layer_masked = np.ma.masked_where(water_mask, data_xr[config['layer']].values)
+            vmin, vmax = config.get('vmin'), config.get('vmax')
             
-            # Overlay
-            img_url = f"data:image/png;base64,{img_base64}"
-            folium.raster_layers.ImageOverlay(
-                image=img_url,
-                bounds=[[lat_min, lon_min], [lat_max, lon_max]],
-                opacity=0.85,
-                interactive=True,
-                cross_origin=False
-            ).add_to(m)
+            if vmin is None or vmax is None:
+                valid_data = layer_masked.compressed()
+                if len(valid_data) > 0:
+                    if vmin is None:
+                        vmin = np.quantile(valid_data, config['quantile_min']) if 'quantile_min' in config else float(valid_data.min())
+                    if vmax is None:
+                        vmax = np.quantile(valid_data, config['quantile_max']) if 'quantile_max' in config else float(valid_data.max())
+                else:
+                    vmin, vmax = vmin or 0, vmax or 1
             
-            # Add marker
-            try:
-                point_value = float(data_xr[config['layer']].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
-                popup_text = f"{config['title']}<br>{lat_input:.4f}°N, {lon_input:.4f}°E<br>Value: {point_value:.2f}"
-            except:
-                popup_text = f"{config['title']}<br>{lat_input:.4f}°N, {lon_input:.4f}°E"
+            if vmin is None or vmax is None or vmin >= vmax:
+                valid_data = layer_masked.compressed()
+                if len(valid_data) > 0:
+                    vmin, vmax = float(np.nanmin(valid_data)), float(np.nanmax(valid_data))
+                else:
+                    vmin, vmax = 0, 1
             
-            folium.CircleMarker(
-                location=[lat_input, lon_input],
-                radius=6,
-                popup=popup_text,
-                color='red',
-                fill=True,
-                fillColor='red',
-                fillOpacity=0.95,
-                weight=2
-            ).add_to(m)
+            if vmin == vmax:
+                vmin, vmax = vmin - 0.5, vmax + 0.5
             
-            # Legend with horizontal colorbar (same as prediction maps)
-            legend_html = f'''
-            <div style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
-                        background-color: white; border:1px solid grey; z-index:9999; 
-                        border-radius: 2px; padding: 3px;">
-            <div style="font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 2px;">{config['title']}</div>
-            <img src="data:image/png;base64,{cbar_base64}" style="width: 160px; height: auto;">
-            </div>
-            '''
+            norm_cont = (LogNorm(vmin=max(vmin, 0.01), vmax=vmax) if config.get('log_scale')
+                         else Normalize(vmin=vmin, vmax=vmax))
             
-            m.get_root().html.add_child(folium.Element(legend_html))
-            
-            st_folium(m, width=300, height=300, key=f"input_{config['layer']}_{lat_input}_{lon_input}")
-            
-# ============================================================================
-# TAB 1: RISK & PRIORITY MAPS
-# ============================================================================
-with tab3:
-    st.header("Risk & Priority Assessment")
+            m = plot_continuous_layer(
+                data_xr, config['layer'], cmap=config['cmap'], norm=norm_cont,
+                title=f"{config['title']} {config['units']}", units=config['units'],
+                lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        
+        # Always overlay nitrate when viewing a layer
+        if df_nitrate_points is not None and not df_nitrate_points.empty:
+            norm_yhat = Normalize(vmin=10, vmax=100)
+            m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+            folium.LayerControl().add_to(m)  # ← NOW overlay is visible
+            st.success(f"✓ Nitrate overlaid on {config['layer'].upper()}", icon="🧪")
+        else:
+            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Contamination Risk (DRASTICLU, 1-9)")
-        risk_map = create_map_with_raster_overlay(
-            lat_input, lon_input, data_xr,
-            "Risk", cmap_risk, norm_risk, RISK_LABELS, risk_9_colors
-        )
-        st_folium(risk_map, width=350, height=350, key=f"risk_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        st.subheader("Management Priority (1-4)")
-        priority_map = create_map_with_raster_overlay(
-            lat_input, lon_input, data_xr,
-            "Priority", cmap_priority, norm_priority, PRIORITY_LABELS, priority_4_colors
-        )
-        st_folium(priority_map, width=350, height=350, key=f"priority_map_{lat_input}_{lon_input}")
+    # Render map FULL-WIDTH as main figure
+    if m:
+        st_folium(m, width=width, height=height, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
+
+
+
 # ============================================================================
-# TAB 2: RIVER SHAP ATTRIBUTION MAPS
+# TAB 3: RISK & PRIORITY MAPS
 # ============================================================================
 with tab2:
-    st.header("🎯 Driver Attribution Analysis (Rank & SHAP)")
+    st.header("🗺️ Risk & Priority Assessment")
     
-    st.info("Top: Driver Rank (1-4) | Bottom: Driver SHAP values (1-4)")
+    # Selectbox to toggle between Risk and Priority
+    assessment_options = [
+        ("risk", "Contamination Risk (1–9)", 'risk_pdp_shap', risk_9_colors, RISK_LABELS),
+        ("priority", "Management Priority (1–4)", 'priority_zones_regulatory', priority_4_colors, PRIORITY_LABELS),
+    ]
     
-    # Get data
+    selected_assessment = st.selectbox("View:", [f"{opt[1]}" for opt in assessment_options], key="assessment_select")
+    assess_idx = next(i for i, opt in enumerate(assessment_options) if opt[1] == selected_assessment)
+    assess_layer = assessment_options[assess_idx]
+    
+    st.info(f"**{assess_layer[1]}**")
+    
+    if assess_layer[2] not in data_xr:
+        st.error(f"❌ Layer {assess_layer[2]} not found")
+        st.stop()
+    
+    water_mask = _get_water_mask(data_xr)
+    
+    # Render the assessment map (both are categorical class layers)
+    m_assess = plot_class_layer(
+        data_xr, assess_layer[2],
+        class_colors=assess_layer[3], class_labels=assess_layer[4],
+        title=assess_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+    )
+    
+    if m_assess:
+        st_folium(m_assess, width=width, height=height, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
+
+# ============================================================================
+# TAB 2: DRIVER ATTRIBUTION ANALYSIS
+# ============================================================================
+with tab3:
+    st.header("🎯 Driver Attribution Analysis")
+    
+    # Verify driver layers exist (fail fast with one clear message)
     try:
-        driver_rank_data = {}
-        driver_shap_data = {}
         for i in range(1, 5):
-            driver_rank_data[i] = data_xr[f'driver_rank_{i}'].values
-            driver_shap_data[i] = data_xr[f'driver_shap_{i}'].values
-    except:
+            _ = data_xr[f'driver_rank_{i}']
+            _ = data_xr[f'driver_shap_{i}']
+    except KeyError:
         st.error("Cannot load driver data")
         st.stop()
     
-    # Water mask
-    lu_data = data_xr['LU'].values
-    water_mask = (lu_data == 80)
-    lats = data_xr['latitude'].values
-    lons = data_xr['longitude'].values
-    lat_min, lat_max = lats.min(), lats.max()
-    lon_min, lon_max = lons.min(), lons.max()
+    water_mask = _get_water_mask(data_xr)
     
-    # Driver colors
+    # Driver colors (DRASTICLU parameter palette)
     driver_colors = {
         0: parameters_8_colors[1],  # D
         1: parameters_8_colors[2],  # R
@@ -994,323 +1056,156 @@ with tab2:
         7: parameters_8_colors[8],  # LU
     }
     
-    driver_cmap = ListedColormap([driver_colors[k] for k in range(8)])
-    norm_driver = BoundaryNorm(np.arange(-0.5, 8.5, 1), 8)
+    # Two selectboxes: Attribution Type + Rank Number
+    col_type, col_rank = st.columns([1.5, 1])
+    with col_type:
+        attr_type = st.selectbox("Attribution Type:", ["Driver Rank", "Driver SHAP"], key="attr_type_select")
+    with col_rank:
+        rank_num = st.selectbox("Rank:", [1, 2, 3, 4], key="attr_rank_select")
     
-    # ====== SECTION 1: DRIVER RANK (1-4) ======
-    st.subheader("📊 Driver Rank (Most Influential)")
+    # Determine which layer to plot
+    if attr_type == "Driver Rank":
+        layer_name = f'driver_rank_{rank_num}'
+        title = f"Most Influential Parameter (Rank {rank_num})"
+    else:
+        layer_name = f'driver_shap_{rank_num}'
+        title = f"Top SHAP Contributor (Rank {rank_num})"
     
-    col_map1, col_map2, col_legend1 = st.columns([1, 1, 0.6])
+    st.info(f"**{title}**")
     
-    ranks_to_plot = [1, 2, 3, 4]
-    rank_positions = [
-        (col_map1, 1), (col_map2, 2),
-        (col_map1, 3), (col_map2, 4)
-    ]
+    # Render the driver attribution map
+    m_driver = plot_class_layer(
+        data_xr, layer_name,
+        class_colors=driver_colors, class_labels=DRIVER_MAP,
+        title=title, lat=lat_input, lon=lon_input,
+        water_mask=water_mask, figsize=(8, 8)
+    )
     
-    for rank, (col, pos) in zip(ranks_to_plot, rank_positions):
-        with col:
-            st.text(f"Rank {rank}", help=f"Driver ranking position {rank}")
-            
-            # Mask data
-            driver_masked = np.ma.masked_where(water_mask, driver_rank_data[rank])
-            
-            # Create figure
-            fig, ax = plt.subplots(figsize=(7, 7), dpi=100, facecolor='none')
-            fig.patch.set_alpha(0)
-            
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['bottom'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.patch.set_alpha(0)
-            
-            im = ax.imshow(driver_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                          cmap=driver_cmap, norm=norm_driver, origin='lower', alpha=0.9,
-                          interpolation='nearest')
-            
-            ax.set_xticks([])
-            ax.set_yticks([])
-            ax.set_xlim([lon_min, lon_max])
-            ax.set_ylim([lat_min, lat_max])
-            
-            plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
-            
-            # Save as PNG
-            img_buffer = BytesIO()
-            plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
-                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
-            img_buffer.seek(0)
-            img_base64 = base64.b64encode(img_buffer.read()).decode()
-            plt.close()
-            
-            # Create folium map
-            m = folium.Map(
-                location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-                zoom_start=10,
-                tiles="OpenStreetMap"
-            )
-            
-            # Overlay
-            img_url = f"data:image/png;base64,{img_base64}"
-            folium.raster_layers.ImageOverlay(
-                image=img_url,
-                bounds=[[lat_min, lon_min], [lat_max, lon_max]],
-                opacity=0.85,
-                interactive=True,
-                cross_origin=False
-            ).add_to(m)
-            
-            # Add marker
-            try:
-                driver_idx = int(data_xr[f'driver_rank_{rank}'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
-                driver_name = DRIVER_MAP.get(driver_idx, '?')
-                marker_color = driver_colors.get(driver_idx, '#CCCCCC')
-                popup_text = f"Rank {rank}: {driver_name}"
-            except:
-                marker_color = 'red'
-                popup_text = f"Rank {rank}"
-            
-            folium.CircleMarker(
-                location=[lat_input, lon_input],
-                radius=5,
-                popup=popup_text,
-                color=marker_color,
-                fill=True,
-                fillColor=marker_color,
-                fillOpacity=0.95,
-                weight=2
-            ).add_to(m)
-            
-            st_folium(m, width=300, height=300, key=f"driver_rank_{rank}_{lat_input}_{lon_input}")
+    if m_driver:
+        st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
     
-    with col_legend1:
-        st.subheader("🎨 Legend", help="Parameter colors")
-        param_list = [
-            ('D', 'Depth', 1),
-            ('R', 'Recharge', 2),
-            ('A', 'Aquifer', 3),
-            ('S', 'Soil', 4),
-            ('T', 'Topography', 5),
-            ('I', 'Impact', 6),
-            ('C', 'Conductivity', 7),
-            ('LU', 'Land Use', 8),
-        ]
-        
-        for code, name, param_num in param_list:
-            color = parameters_8_colors[param_num]
-            st.markdown(
-                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 11px;">'
-                f'<b>{code}</b> {name}</div>',
-                unsafe_allow_html=True
-            )
-    
-    st.markdown("---")
-    
-    # ====== SECTION 2: DRIVER SHAP (1-4) ======
-    st.subheader("🔍 Driver SHAP Contribution (Top 4)")
-    
-    col_map3, col_map4, col_legend2 = st.columns([1, 1, 0.6])
-    
-    shap_ranks_to_plot = [1, 2, 3, 4]
-    shap_positions = [
-        (col_map3, 1), (col_map4, 2),
-        (col_map3, 3), (col_map4, 4)
-    ]
-    
-    for shap_rank, (col, pos) in zip(shap_ranks_to_plot, shap_positions):
-        with col:
-            st.text(f"SHAP Rank {shap_rank}", help=f"SHAP contribution ranking {shap_rank}")
-            
-            # Mask data
-            shap_masked = np.ma.masked_where(water_mask, driver_shap_data[shap_rank])
-            
-            # Create figure
-            fig, ax = plt.subplots(figsize=(7, 7), dpi=100, facecolor='none')
-            fig.patch.set_alpha(0)
-            
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['bottom'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.patch.set_alpha(0)
-            
-            im = ax.imshow(shap_masked, extent=[lon_min, lon_max, lat_min, lat_max],
-                          cmap=driver_cmap, norm=norm_driver, origin='lower', alpha=0.9,
-                          interpolation='nearest')
-            
-            ax.set_xticks([])
-            ax.set_yticks([])
-            ax.set_xlim([lon_min, lon_max])
-            ax.set_ylim([lat_min, lat_max])
-            
-            plt.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0, wspace=0)
-            
-            # Save as PNG
-            img_buffer = BytesIO()
-            plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=100,
-                       facecolor='none', edgecolor='none', transparent=True, pad_inches=0)
-            img_buffer.seek(0)
-            img_base64 = base64.b64encode(img_buffer.read()).decode()
-            plt.close()
-            
-            # Create folium map
-            m = folium.Map(
-                location=[(lat_min + lat_max) / 2, (lon_min + lon_max) / 2],
-                zoom_start=10,
-                tiles="OpenStreetMap"
-            )
-            
-            # Overlay
-            img_url = f"data:image/png;base64,{img_base64}"
-            folium.raster_layers.ImageOverlay(
-                image=img_url,
-                bounds=[[lat_min, lon_min], [lat_max, lon_max]],
-                opacity=0.85,
-                interactive=True,
-                cross_origin=False
-            ).add_to(m)
-            
-            # Add marker
-            try:
-                shap_idx = int(data_xr[f'driver_shap_{shap_rank}'].sel(latitude=lat_input, longitude=lon_input, method='nearest').values)
-                driver_name = DRIVER_MAP.get(shap_idx, '?')
-                marker_color = driver_colors.get(shap_idx, '#CCCCCC')
-                popup_text = f"SHAP {shap_rank}: {driver_name}"
-            except:
-                marker_color = 'red'
-                popup_text = f"SHAP {shap_rank}"
-            
-            folium.CircleMarker(
-                location=[lat_input, lon_input],
-                radius=5,
-                popup=popup_text,
-                color=marker_color,
-                fill=True,
-                fillColor=marker_color,
-                fillOpacity=0.95,
-                weight=2
-            ).add_to(m)
-            
-            st_folium(m, width=300, height=300, key=f"driver_shap_{shap_rank}_{lat_input}_{lon_input}")
-    
-    with col_legend2:
-        st.subheader("🎨 Legend", help="Parameter colors")
-        param_list = [
-            ('D', 'Depth', 1),
-            ('R', 'Recharge', 2),
-            ('A', 'Aquifer', 3),
-            ('S', 'Soil', 4),
-            ('T', 'Topography', 5),
-            ('I', 'Impact', 6),
-            ('C', 'Conductivity', 7),
-            ('LU', 'Land Use', 8),
-        ]
-        
-        for code, name, param_num in param_list:
-            color = parameters_8_colors[param_num]
-            st.markdown(
-                f'<div style="padding: 5px; background-color: {color}; color: white; border-radius: 2px; margin: 2px 0; font-size: 11px;">'
-                f'<b>{code}</b> {name}</div>',
-                unsafe_allow_html=True
-            )
+   
 
 
 # ============================================================================
-# TAB 4: PREDICTION MAPS
+# TAB 4: PREDICTION MAPS — VULNERABILITY & CONCENTRATION
 # ============================================================================
 with tab1:
-    st.header("Prediction Maps")
+    st.header("📊 Prediction Maps: Concentration & Vulnerability")
     
-    # Toggle to show nitrate measurements
-    show_nitrate_points = st.checkbox("🧪 Show Nitrate Measurement Points", value=False, key="show_nitrate_toggle")
-  
-    col1, col2 = st.columns(2)
+    # Create two sub-tabs
+    sub_tab_conc, sub_tab_vuln = st.tabs(["🟠 Concentration", "🔴 Vulnerability"])
     
-    with col1:
-        # index_shap: 0-10 (continuous vulnerability)
-        norm_shap = Normalize(vmin=80, vmax=200)
-        shap_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                        'index_shap', cmap_vulnerability, norm_shap,
-                                        title=PREDICTION_TITLES['index_shap'])
-        if shap_map:
-            st_folium(shap_map, width=350, height=350, key=f"shap_index_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # index_shap_std: 12-26 (uncertainty, viridis)
-        norm_shap_std = Normalize(vmin=12, vmax=26)
-        shap_std_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                            'index_shap_std', cmap_std, norm_shap_std,
-                                            title=PREDICTION_TITLES['index_shap_std'])
-        if shap_std_map:
-            st_folium(shap_std_map, width=350, height=350, key=f"shap_std_map_{lat_input}_{lon_input}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # index_shap_class: 1-5 (CATEGORICAL)
-        vuln_class_cmap = ListedColormap([vulnerability_5_colors[k] for k in sorted(vulnerability_5_colors.keys())])
-        norm_shap_class = BoundaryNorm(np.arange(0.5, 5.5, 1), vuln_class_cmap.N)
-        shap_class_map = create_map_with_raster_overlay(
-            lat_input, lon_input, data_xr,
-            "Defuzzified Specific Vulnerability", vuln_class_cmap, norm_shap_class, 
-            vulnerability_class_labels, vulnerability_5_colors
-        )
-        st_folium(shap_class_map, width=350, height=350, key=f"shap_class_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # index_shap_entropy_norm: 0-1 (entropy, davos)
-        norm_entropy = Normalize(vmin=0, vmax=1)
-        shap_entropy_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                                'index_shap_entropy_norm', cmap_entropy, norm_entropy,
-                                                title=PREDICTION_TITLES['index_shap_entropy_norm'])
-        if shap_entropy_map:
-            st_folium(shap_entropy_map, width=350, height=350, key=f"shap_entropy_map_{lat_input}_{lon_input}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # y_hat: 10-100 (continuous nitrate)
-        norm_yhat = Normalize(vmin=10, vmax=100)
-        y_hat_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                         'y_hat', cmap_nitrate, norm_yhat,
-                                         title=PREDICTION_TITLES['y_hat'])
-        if y_hat_map and show_nitrate_points:
-            y_hat_map = add_nitrate_layer(y_hat_map, df_nitrate_points, cmap_nitrate, norm_yhat, show_nitrate_points)
+   
+    # ========== SUB-TAB 2: CONCENTRATION MAPS ==========
+    with sub_tab_conc:
+        st.subheader("Predicted NO₃⁻ Concentration (mg/L)")
+        
+        # Concentration layer options
+        conc_options = [
+            ("y_hat", "Continuous Concentration (10–100)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
+            ("y_hat_residuals", "Residuals (Prediction Error)", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
+            ("y_hat_class", "Concentration Classes (Binned)", 'y_hat_log_class', None, None, "class"),
+            ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+        ]
+        
+        # Layer selector & controls
+        col_view, col_toggle = st.columns([2, 1])
+        with col_view:
+            selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="conc_map_select")
+        with col_toggle:
+            show_ground_truth = st.checkbox("📍 Ground Truth", value=True, key="show_gt_conc")
+        
+        conc_idx = next(i for i, opt in enumerate(conc_options) if opt[1] == selected_conc)
+        conc_layer = conc_options[conc_idx]
+        
+        st.info(f"**{conc_layer[1]}**")
+        
+        if conc_layer[2] not in data_xr:
+            st.error(f"❌ Layer {conc_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if conc_layer[5] == "class":
+            # CLASS layer: y_hat_log_class (binned concentration predictions)
+            m_conc = plot_class_layer(
+                data_xr, conc_layer[2],
+                class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+            # Overlay measurement ground truth classes (pre-calculated in df) if toggled on
+            if show_ground_truth and m_conc and df_nitrate_points is not None and not df_nitrate_points.empty:
+                m_conc = add_measurement_classes_layer(m_conc, df_nitrate_points, nitrate_5_colors, nitrate_class_labels)
+                folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
+                st.success("✓ Ground truth classes overlaid", icon="🧪")
+        else:
+            # CONTINUOUS layers (concentration, residuals/error, entropy)
+            m_conc = plot_continuous_layer(
+                data_xr, conc_layer[2], cmap=conc_layer[3], norm=conc_layer[4],
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
             
-        if y_hat_map:
-            st_folium(y_hat_map, width=350, height=350, key=f"y_hat_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # y_hat_std: 5-40 (uncertainty, viridis)
-        norm_yhat_std = Normalize(vmin=5, vmax=40)
-        y_hat_std_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                             'y_hat_std', cmap_std, norm_yhat_std,
-                                             title=PREDICTION_TITLES['y_hat_std'])
-        if y_hat_std_map:
-            st_folium(y_hat_std_map, width=350, height=350, key=f"y_hat_std_map_{lat_input}_{lon_input}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # y_hat_log_class: 1-5 (CATEGORICAL)
-        nitrate_class_cmap = ListedColormap([nitrate_5_colors[k] for k in sorted(nitrate_5_colors.keys())])
-        norm_yhat_class = BoundaryNorm(np.arange(0.5, 5.5, 1), nitrate_class_cmap.N)
-        y_hat_class_map = create_map_with_raster_overlay(
-            lat_input, lon_input, data_xr,
-            "Defuzzified NO₃⁻ Contamination", nitrate_class_cmap, norm_yhat_class, 
-            nitrate_class_labels, nitrate_5_colors
-        )
-        st_folium(y_hat_class_map, width=350, height=350, key=f"y_hat_class_map_{lat_input}_{lon_input}")
-    
-    with col2:
-        # y_hat_log_entropy_norm: 0-1 (entropy, davos)
-        norm_yhat_entropy = Normalize(vmin=0, vmax=1)
-        y_hat_entropy_map = create_prediction_map(lat_input, lon_input, data_xr,
-                                                 'y_hat_log_entropy_norm', cmap_entropy, norm_yhat_entropy,
-                                                 title=PREDICTION_TITLES['y_hat_log_entropy_norm'])
-        if y_hat_entropy_map:
-            st_folium(y_hat_entropy_map, width=350, height=350, key=f"y_hat_entropy_map_{lat_input}_{lon_input}")
+            # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
+            if conc_layer[0] == "y_hat_residuals" and show_ground_truth and m_conc is not None:
+                if df_nitrate_points is not None and not df_nitrate_points.empty:
+                    norm_residuals = Normalize(vmin=-50, vmax=50)
+                    m_conc = add_measurement_residuals_layer(m_conc, df_nitrate_points, cmap_std, norm_residuals)
+                    folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
+                    st.success("✓ Ground truth residuals overlaid", icon="🧪")
+
+            # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
+            if conc_layer[0] == "y_hat" and show_ground_truth and m_conc is not None:
+                if df_nitrate_points is not None and not df_nitrate_points.empty:
+                    norm_residuals = Normalize(vmin=-50, vmax=50)
+                    m_conc = add_nitrate_layer(m_conc, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+                    folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
+                    st.success("✓ Ground truth residuals overlaid", icon="🧪")
+        
+        if m_conc:
+            st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+
+    # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
+    with sub_tab_vuln:
+        st.subheader("Groundwater Vulnerability Index (SHAP-based)")
+        
+        # Vulnerability layer options
+        vuln_options = [
+            ("index_shap", "Continuous Index (80–200)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
+            ("index_shap_std", "Uncertainty (12–26)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
+            ("index_shap_class", "5-Class (Low–Very High)", 'index_shap_class', None, None, "class"),
+            ("index_shap_entropy", "Entropy (0–1)", 'index_shap_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+        ]
+        
+        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
+        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
+        vuln_layer = vuln_options[vuln_idx]
+        
+        st.info(f"**{vuln_layer[1]}**")
+        
+        if vuln_layer[2] not in data_xr:
+            st.error(f"❌ Layer {vuln_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if vuln_layer[5] == "class":
+            # CLASS layer: index_shap_class
+            m_vuln = plot_class_layer(
+                data_xr, vuln_layer[2],
+                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        else:
+            # CONTINUOUS layers
+            m_vuln = plot_continuous_layer(
+                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        
+        if m_vuln:
+            st_folium(m_vuln, width=width, height=height, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
+
 
 
 # ============================================================================
