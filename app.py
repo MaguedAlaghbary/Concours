@@ -56,6 +56,139 @@ df_nitrate_points = load_nitrate_points()
 # ============================================================================
 # FUNCTION TO ADD NITRATE POINTS TO FOLIUM MAP
 # ============================================================================
+
+
+# ============================================================================
+# FUNCTION TO ADD NITRATE POINTS TO FOLIUM MAP
+# ============================================================================
+def add_measurement_residuals_layer(m, df_nitrate, cmap, norm_obj):
+    """
+    Overlay measurement residuals (pre-calculated in df) as colored points.
+    
+    Assumes df_nitrate has columns:
+        - latitude, longitude: measurement locations
+        - residual: pre-calculated error (actual - predicted)
+    
+    Args:
+        m: folium.Map
+        df_nitrate: DataFrame with lat/lon/residual columns
+        cmap: matplotlib colormap (e.g., diverging blue-red)
+        norm_obj: matplotlib norm (e.g., Normalize(vmin=-50, vmax=50))
+    
+    Returns:
+        Modified folium.Map with measurement residual points
+    """
+    if df_nitrate is None or df_nitrate.empty:
+        return m
+    
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    residual_col = col_names.get('residual') or col_names.get('error')
+    
+    if not all([lat_col, lon_col, residual_col]):
+        return m
+    
+    fg_residuals = folium.FeatureGroup(name='🧪 Measurement Residuals (Actual − Predicted)', show=True)
+    count = 0
+    
+    for idx, row in df_nitrate.iterrows():
+        try:
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            residual_val = float(row[residual_col])
+            
+            # Normalize residual and get color
+            normalized_residual = norm_obj(residual_val)
+            rgba = cmap(normalized_residual)
+            hex_color = '#{:02x}{:02x}{:02x}'.format(
+                int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255)
+            )
+            
+            # Add circle marker
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                popup=f"Error: {residual_val:+.1f} mg/L<br>{lat:.4f}°N, {lon:.4f}°E",
+                color=hex_color,
+                fill=True,
+                fillColor=hex_color,
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
+            ).add_to(fg_residuals)
+            count += 1
+        except (ValueError, TypeError, KeyError):
+            continue
+    
+    if count > 0:
+        fg_residuals.add_to(m)
+    
+    return m
+
+
+def add_measurement_classes_layer(m, df_nitrate, class_colors, class_labels):
+    """
+    Overlay measurement binned classes (pre-calculated in df) as colored points.
+    
+    Assumes df_nitrate has columns:
+        - latitude, longitude: measurement locations
+        - y_class or predicted_class: pre-calculated class number (1-5)
+    
+    Args:
+        m: folium.Map
+        df_nitrate: DataFrame with lat/lon/y_class columns
+        class_colors: dict mapping class number → hex color
+        class_labels: dict mapping class number → label string
+    
+    Returns:
+        Modified folium.Map with measurement class points
+    """
+    if df_nitrate is None or df_nitrate.empty:
+        return m
+    
+    col_names = {k.lower(): k for k in df_nitrate.columns}
+    lat_col = col_names.get('latitude') or col_names.get('lat')
+    lon_col = col_names.get('longitude') or col_names.get('lon')
+    class_col = col_names.get('y_class') or col_names.get('predicted_class')
+    
+    if not all([lat_col, lon_col, class_col]):
+        return m
+    
+    fg_meas_classes = folium.FeatureGroup(name='🧪 Measurement Classes (Ground Truth)', show=True)
+    count = 0
+    
+    for idx, row in df_nitrate.iterrows():
+        try:
+            lon = float(row[lon_col])
+            lat = float(row[lat_col])
+            class_num = int(row[class_col])
+            
+            label = class_labels.get(class_num, str(class_num))
+            color = class_colors.get(class_num, '#cccccc')
+            
+            # Add circle marker
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                popup=f"Class: {class_num} ({label})<br>{lat:.4f}°N, {lon:.4f}°E",
+                color=color,
+                fill=True,
+                fillColor=color,
+                fillOpacity=0.85,
+                weight=1.5,
+                opacity=0.95
+            ).add_to(fg_meas_classes)
+            count += 1
+        except (ValueError, TypeError, KeyError):
+            continue
+    
+    if count > 0:
+        fg_meas_classes.add_to(m)
+    
+    return m
+
+
 def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     """
     Add nitrate measurement points to folium map with color-coding by concentration.
