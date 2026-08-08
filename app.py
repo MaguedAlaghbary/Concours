@@ -23,7 +23,7 @@ st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
 # ============================================================================
 @st.cache_resource
 def load_data():
-    with open('djibouti_data_minimal.pkl', 'rb') as f:
+    with open('douda_minimal.pkl', 'rb') as f:
         data = pickle.load(f)
     return data
 
@@ -40,7 +40,7 @@ except FileNotFoundError:
 @st.cache_data
 def load_nitrate_points():
     try:
-        df_nitrate = pd.read_csv('lat_lon_d_n_data.csv')
+        df_nitrate = pd.read_csv('results.csv')
         # Ensure column names are correct
         df_nitrate.columns = df_nitrate.columns.str.strip().str.lower()
         return df_nitrate
@@ -76,7 +76,7 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
     col_names = {k.lower(): k for k in df_nitrate.columns}
     lat_col = col_names.get('latitude') or col_names.get('lat')
     lon_col = col_names.get('longitude') or col_names.get('lon')
-    no3_col = col_names.get('no3') or col_names.get('nitrate') or col_names.get('concentration')
+    no3_col = col_names.get('NO3') or col_names.get('nitrate') or col_names.get('concentration')
     
     if not all([lat_col, lon_col, no3_col]):
         return m
