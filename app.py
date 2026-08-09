@@ -1038,7 +1038,7 @@ with tab1:
             if show_ground_truth and m_conc and df_nitrate_points is not None and not df_nitrate_points.empty:
                 m_conc = add_measurement_classes_layer(m_conc, df_nitrate_points, nitrate_5_colors, nitrate_class_labels)
                 folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
-                st.success("✓ Ground truth classes overlaid", icon="🧪")
+                #st.success("✓ Ground truth classes overlaid", icon="🧪")
         else:
             # CONTINUOUS layers (concentration, residuals/error, entropy)
             m_conc = plot_continuous_layer(
