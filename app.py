@@ -891,12 +891,7 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # ============================================================================
 # TAB 0: DRASTICLU INPUT LAYERS
 # ============================================================================
-# ============================================================================
-# TAB 0: DRASTICLU INPUT LAYERS
-# ============================================================================
-# ============================================================================
-# TAB 0: DRASTICLU INPUT LAYERS
-# ============================================================================
+
 with tab_inputs:
     st.header("📥 DRASTICLU Input Layers (8 Parameters)")
     
@@ -992,103 +987,8 @@ with tab_inputs:
         st_folium(m, width=width, height=height, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
 
 
-
 # ============================================================================
-# TAB 3: RISK & PRIORITY MAPS
-# ============================================================================
-with tab2:
-    st.header("🗺️ Risk & Priority Assessment")
-    
-    # Selectbox to toggle between Risk and Priority
-    assessment_options = [
-        ("risk", "Contamination Risk (1–9)", 'risk_pdp_shap', risk_9_colors, RISK_LABELS),
-        ("priority", "Management Priority (1–4)", 'priority_zones_regulatory', priority_4_colors, PRIORITY_LABELS),
-    ]
-    
-    selected_assessment = st.selectbox("View:", [f"{opt[1]}" for opt in assessment_options], key="assessment_select")
-    assess_idx = next(i for i, opt in enumerate(assessment_options) if opt[1] == selected_assessment)
-    assess_layer = assessment_options[assess_idx]
-    
-    st.info(f"**{assess_layer[1]}**")
-    
-    if assess_layer[2] not in data_xr:
-        st.error(f"❌ Layer {assess_layer[2]} not found")
-        st.stop()
-    
-    water_mask = _get_water_mask(data_xr)
-    
-    # Render the assessment map (both are categorical class layers)
-    m_assess = plot_class_layer(
-        data_xr, assess_layer[2],
-        class_colors=assess_layer[3], class_labels=assess_layer[4],
-        title=assess_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-    )
-    
-    if m_assess:
-        st_folium(m_assess, width=width, height=height, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
-
-# ============================================================================
-# TAB 2: DRIVER ATTRIBUTION ANALYSIS
-# ============================================================================
-with tab3:
-    st.header("🎯 Driver Attribution Analysis")
-    
-    # Verify driver layers exist (fail fast with one clear message)
-    try:
-        for i in range(1, 5):
-            _ = data_xr[f'driver_rank_{i}']
-            _ = data_xr[f'driver_shap_{i}']
-    except KeyError:
-        st.error("Cannot load driver data")
-        st.stop()
-    
-    water_mask = _get_water_mask(data_xr)
-    
-    # Driver colors (DRASTICLU parameter palette)
-    driver_colors = {
-        0: parameters_8_colors[1],  # D
-        1: parameters_8_colors[2],  # R
-        2: parameters_8_colors[3],  # A
-        3: parameters_8_colors[4],  # S
-        4: parameters_8_colors[5],  # T
-        5: parameters_8_colors[6],  # I
-        6: parameters_8_colors[7],  # C
-        7: parameters_8_colors[8],  # LU
-    }
-    
-    # Two selectboxes: Attribution Type + Rank Number
-    col_type, col_rank = st.columns([1.5, 1])
-    with col_type:
-        attr_type = st.selectbox("Attribution Type:", ["Driver Rank", "Driver SHAP"], key="attr_type_select")
-    with col_rank:
-        rank_num = st.selectbox("Rank:", [1, 2, 3, 4], key="attr_rank_select")
-    
-    # Determine which layer to plot
-    if attr_type == "Driver Rank":
-        layer_name = f'driver_rank_{rank_num}'
-        title = f"Most Influential Parameter (Rank {rank_num})"
-    else:
-        layer_name = f'driver_shap_{rank_num}'
-        title = f"Top SHAP Contributor (Rank {rank_num})"
-    
-    st.info(f"**{title}**")
-    
-    # Render the driver attribution map
-    m_driver = plot_class_layer(
-        data_xr, layer_name,
-        class_colors=driver_colors, class_labels=DRIVER_MAP,
-        title=title, lat=lat_input, lon=lon_input,
-        water_mask=water_mask, figsize=(8, 8)
-    )
-    
-    if m_driver:
-        st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
-    
-   
-
-
-# ============================================================================
-# TAB 4: PREDICTION MAPS — VULNERABILITY & CONCENTRATION
+# TAB 1: PREDICTION MAPS — VULNERABILITY & CONCENTRATION
 # ============================================================================
 with tab1:
     st.header("📊 Prediction Maps: Concentration & Vulnerability")
@@ -1205,6 +1105,101 @@ with tab1:
         
         if m_vuln:
             st_folium(m_vuln, width=width, height=height, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
+
+
+# ============================================================================
+# TAB 2: RISK & PRIORITY MAPS
+# ============================================================================
+with tab2:
+    st.header("🗺️ Risk & Priority Assessment")
+    
+    # Selectbox to toggle between Risk and Priority
+    assessment_options = [
+        ("risk", "Contamination Risk (1–9)", 'risk_pdp_shap', risk_9_colors, RISK_LABELS),
+        ("priority", "Management Priority (1–4)", 'priority_zones_regulatory', priority_4_colors, PRIORITY_LABELS),
+    ]
+    
+    selected_assessment = st.selectbox("View:", [f"{opt[1]}" for opt in assessment_options], key="assessment_select")
+    assess_idx = next(i for i, opt in enumerate(assessment_options) if opt[1] == selected_assessment)
+    assess_layer = assessment_options[assess_idx]
+    
+    st.info(f"**{assess_layer[1]}**")
+    
+    if assess_layer[2] not in data_xr:
+        st.error(f"❌ Layer {assess_layer[2]} not found")
+        st.stop()
+    
+    water_mask = _get_water_mask(data_xr)
+    
+    # Render the assessment map (both are categorical class layers)
+    m_assess = plot_class_layer(
+        data_xr, assess_layer[2],
+        class_colors=assess_layer[3], class_labels=assess_layer[4],
+        title=assess_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+    )
+    
+    if m_assess:
+        st_folium(m_assess, width=width, height=height, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
+
+# ============================================================================
+# TAB 3: DRIVER ATTRIBUTION ANALYSIS
+# ============================================================================
+with tab3:
+    st.header("🎯 Driver Attribution Analysis")
+    
+    # Verify driver layers exist (fail fast with one clear message)
+    try:
+        for i in range(1, 5):
+            _ = data_xr[f'driver_rank_{i}']
+            _ = data_xr[f'driver_shap_{i}']
+    except KeyError:
+        st.error("Cannot load driver data")
+        st.stop()
+    
+    water_mask = _get_water_mask(data_xr)
+    
+    # Driver colors (DRASTICLU parameter palette)
+    driver_colors = {
+        0: parameters_8_colors[1],  # D
+        1: parameters_8_colors[2],  # R
+        2: parameters_8_colors[3],  # A
+        3: parameters_8_colors[4],  # S
+        4: parameters_8_colors[5],  # T
+        5: parameters_8_colors[6],  # I
+        6: parameters_8_colors[7],  # C
+        7: parameters_8_colors[8],  # LU
+    }
+    
+    # Two selectboxes: Attribution Type + Rank Number
+    col_type, col_rank = st.columns([1.5, 1])
+    with col_type:
+        attr_type = st.selectbox("Attribution Type:", ["Driver Rank", "Driver SHAP"], key="attr_type_select")
+    with col_rank:
+        rank_num = st.selectbox("Rank:", [1, 2, 3], key="attr_rank_select")
+    
+    # Determine which layer to plot
+    if attr_type == "Driver Rank":
+        layer_name = f'driver_rank_{rank_num}'
+        title = f"Most Influential Parameter (Rank {rank_num})"
+    else:
+        layer_name = f'driver_shap_{rank_num}'
+        title = f"Top SHAP Contributor (Rank {rank_num})"
+    
+    st.info(f"**{title}**")
+    
+    # Render the driver attribution map
+    m_driver = plot_class_layer(
+        data_xr, layer_name,
+        class_colors=driver_colors, class_labels=DRIVER_MAP,
+        title=title, lat=lat_input, lon=lon_input,
+        water_mask=water_mask, figsize=(8, 8)
+    )
+    
+    if m_driver:
+        st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
+    
+   
+
 
 
 
