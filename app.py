@@ -914,7 +914,7 @@ with tab_inputs:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
             folium.LayerControl().add_to(m)  # Add layer control AFTER adding layers
-            st.success("✓ Nitrate measurements displayed", icon="🧪")
+            #st.success("✓ Nitrate measurements displayed", icon="🧪")
         else:
             st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
     else:
@@ -1003,8 +1003,8 @@ with tab1:
         
         # Concentration layer options
         conc_options = [
-            ("y_hat", "Continuous Concentration [10–100] (mg/L))", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
-            ("y_hat_residuals", "Prediction Error (mg/L))", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
+            ("y_hat", "Continuous Concentration [10–100] (mg/L)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
+            ("y_hat_residuals", "Prediction Error (mg/L)", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
             ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
             ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
         ]
@@ -1019,7 +1019,7 @@ with tab1:
         conc_idx = next(i for i, opt in enumerate(conc_options) if opt[1] == selected_conc)
         conc_layer = conc_options[conc_idx]
         
-        st.info(f"**{conc_layer[1]}**")
+        #st.info(f"**{conc_layer[1]}**")
         
         if conc_layer[2] not in data_xr:
             st.error(f"❌ Layer {conc_layer[2]} not found")
@@ -1081,7 +1081,7 @@ with tab1:
         vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
         vuln_layer = vuln_options[vuln_idx]
         
-        st.info(f"**{vuln_layer[1]}**")
+        #st.info(f"**{vuln_layer[1]}**")
         
         if vuln_layer[2] not in data_xr:
             st.error(f"❌ Layer {vuln_layer[2]} not found")
@@ -1123,7 +1123,7 @@ with tab2:
     assess_idx = next(i for i, opt in enumerate(assessment_options) if opt[1] == selected_assessment)
     assess_layer = assessment_options[assess_idx]
     
-    st.info(f"**{assess_layer[1]}**")
+    #st.info(f"**{assess_layer[1]}**")
     
     if assess_layer[2] not in data_xr:
         st.error(f"❌ Layer {assess_layer[2]} not found")
