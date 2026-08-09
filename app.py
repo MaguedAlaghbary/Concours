@@ -723,9 +723,9 @@ def _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64,
         location=[lat, lon],
         radius=marker_radius,
         popup=popup_text,
-        color=marker_color,
-        fill=True,
-        fillColor=marker_color,
+        color='black',
+        fill=False,
+        #fillColor=marker_color,
         fillOpacity=0.95,
         weight=2
     ).add_to(m)
@@ -853,7 +853,7 @@ def plot_class_layer(data_xr, var_name, class_colors, class_labels, title, lat, 
     except Exception:
         selected_value = None
         label = "N/A"
-    marker_color = class_colors.get(selected_value, 'red')
+    marker_color = class_colors.get(selected_value, 'black')
     popup_text = f"<b>{title}</b><br>{lat:.4f}°N, {lon:.4f}°E<br>Class: {selected_value} ({label})"
 
     m = _make_base_folium_map(lat_min, lat_max, lon_min, lon_max, img_b64, lat, lon,
@@ -978,7 +978,7 @@ with tab_inputs:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
             folium.LayerControl().add_to(m)  # ← NOW overlay is visible
-            st.success(f"✓ Nitrate overlaid on {config['layer'].upper()}", icon="🧪")
+            #st.success(f"✓ Nitrate overlaid on {config['layer'].upper()}", icon="🧪")
         else:
             st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
     
