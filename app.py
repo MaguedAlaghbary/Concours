@@ -984,7 +984,7 @@ with tab_inputs:
     
     # Render map FULL-WIDTH as main figure
     if m:
-        st_folium(m, width=width, height=height, key=f"layer_{selected_view}_{lat_input}_{lon_input}")
+        st_folium(m, width=width, height=height,)# key=f"layer_{selected_view}_{lat_input}_{lon_input}")
 
 
 # ============================================================================
@@ -1063,7 +1063,7 @@ with tab1:
                     #st.success("✓ Ground truth residuals overlaid", icon="🧪")
         
         if m_conc:
-            st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+            st_folium(m_conc, width=width, height=height,)# key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
     # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
     with sub_tab_vuln:
@@ -1104,7 +1104,7 @@ with tab1:
             )
         
         if m_vuln:
-            st_folium(m_vuln, width=width, height=height, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
+            st_folium(m_vuln, width=width, height=height,) #key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
 
 
 # ============================================================================
@@ -1139,7 +1139,7 @@ with tab2:
     )
     
     if m_assess:
-        st_folium(m_assess, width=width, height=height, key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
+        st_folium(m_assess, width=width, height=height,)# key=f"assess_{assess_layer[0]}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 3: DRIVER ATTRIBUTION ANALYSIS
@@ -1196,7 +1196,7 @@ with tab3:
     )
     
     if m_driver:
-        st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
+        st_folium(m_driver, width=width, height=height,)# key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
     
    
 # ============================================================================
