@@ -1199,7 +1199,176 @@ with tab3:
         st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
     
    
+# ============================================================================
+# FOOTER WITH DOWNLOAD OPTIONS
+# ============================================================================
+st.sidebar.markdown("---")
+st.sidebar.header("📥 Export & Download")
 
+# Expander for download options
+with st.sidebar.expander("💾 Download Model Data", expanded=False):
+    st.markdown(f"**Download {location_name} Model & Layers**")
+    
+    # Select which variables to download
+    st.write("**Select layers to include:**")
+    
+    available_vars = list(data_xr.data_vars.keys())
+    
+    selected_vars = st.multiselect(
+        "Variables to export",
+        available_vars,
+        default=available_vars[:3],  # Pre-select first 3
+        key="download_vars_select",
+        help="Choose which variables to include in download"
+    )
+    
+    # Select download format
+    st.write("**Download Format:**")
+    download_format = st.radio(
+        "Format",
+        options=["NetCDF (.nc)", "GeoTIFF (.tif)", "Pickle (.pkl)", "CSV (tab-delimited)"],
+        key="download_format_select",
+        help="Choose file format for download"
+    )
+    
+    # Download button
+    if st.button("📥 Prepare Download", key="prepare_download"):
+        if not selected_vars:
+            st.error("❌ Please select at least one variable to download")
+        else:
+            try:
+                # Subset xarray with selected variables
+                data_subset = data_xr[selected_vars]
+                
+                if download_format == "NetCDF (.nc)":
+                    # Save as NetCDF
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp:
+                        data_subset.to_netcdf(tmp.name)
+                        with open(tmp.name, 'rb') as f:
+                            file_data = f.read()
+                        filename = f"{location_name.lower()}_model.nc"
+                
+                elif download_format == "Pickle (.pkl)":
+                    # Save as Pickle (keeps xarray structure)
+                    import tempfile
+                    import pickle as pkl
+                    with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as tmp:
+                        with open(tmp.name, 'wb') as f:
+                            pkl.dump(data_subset, f)
+                        with open(tmp.name, 'rb') as f:
+                            file_data = f.read()
+                        filename = f"{location_name.lower()}_model.pkl"
+                
+                elif download_format == "GeoTIFF (.tif)":
+                    st.info("ℹ️ GeoTIFF export requires rasterio library")
+                    st.code("pip install rasterio")
+                    try:
+                        import rasterio
+                        from rasterio.transform import from_bounds
+                        import tempfile
+                        import numpy as np
+                        
+                        # Get first variable for GeoTIFF
+                        var_name = selected_vars[0]
+                        data_array = data_xr[var_name].values
+                        
+                        # Get bounds
+                        lat_min = float(data_xr['latitude'].min())
+                        lat_max = float(data_xr['latitude'].max())
+                        lon_min = float(data_xr['longitude'].min())
+                        lon_max = float(data_xr['longitude'].max())
+                        
+                        # Create transform
+                        transform = from_bounds(lon_min, lat_min, lon_max, lat_max, 
+                                              data_array.shape[1], data_array.shape[0])
+                        
+                        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
+                            with rasterio.open(
+                                tmp.name, 'w',
+                                driver='GTiff',
+                                height=data_array.shape[0],
+                                width=data_array.shape[1],
+                                count=1,
+                                dtype=data_array.dtype,
+                                crs='EPSG:4326',
+                                transform=transform,
+                            ) as dst:
+                                dst.write(data_array, 1)
+                            
+                            with open(tmp.name, 'rb') as f:
+                                file_data = f.read()
+                            filename = f"{location_name.lower()}_model.tif"
+                    except ImportError:
+                        st.error("❌ rasterio not installed. Use NetCDF or Pickle instead.")
+                        st.stop()
+                
+                elif download_format == "CSV (tab-delimited)":
+                    # Flatten to CSV (first variable only)
+                    var_name = selected_vars[0]
+                    data_array = data_xr[var_name].values
+                    lat = data_xr['latitude'].values
+                    lon = data_xr['longitude'].values
+                    
+                    import pandas as pd
+                    import tempfile
+                    
+                    # Create meshgrid
+                    lon_grid, lat_grid = np.meshgrid(lon, lat)
+                    
+                    # Flatten
+                    df_export = pd.DataFrame({
+                        'latitude': lat_grid.flatten(),
+                        'longitude': lon_grid.flatten(),
+                        var_name: data_array.flatten()
+                    })
+                    
+                    csv_string = df_export.to_csv(index=False, sep='\t')
+                    file_data = csv_string.encode()
+                    filename = f"{location_name.lower()}_model.csv"
+                
+                # Streamlit download button
+                st.download_button(
+                    label=f"📥 Download as {download_format}",
+                    data=file_data,
+                    file_name=filename,
+                    mime="application/octet-stream",
+                    key="download_button"
+                )
+                
+                st.success(f"✅ Ready! File: {filename}")
+                st.info(f"📊 Variables included: {', '.join(selected_vars)}")
+                
+            except Exception as e:
+                st.error(f"❌ Error preparing download: {str(e)}")
+    
+    # Info about formats
+    with st.expander("ℹ️ About formats"):
+        st.markdown("""
+        **NetCDF (.nc)**
+        - Best for scientific data
+        - Keeps all metadata
+        - Compressed file size
+        - Opens in: QGIS, Python (xarray), Matlab, etc.
+        
+        **Pickle (.pkl)**
+        - Keeps xarray structure
+        - Can reload directly in Python
+        - Largest file size
+        - Best for Python workflows
+        
+        **GeoTIFF (.tif)**
+        - Geospatial raster format
+        - Opens in: QGIS, ArcGIS, Google Earth
+        - Only first layer exported
+        - Requires rasterio library
+        
+        **CSV (tab-delimited)**
+        - Simple tabular format
+        - Opens in Excel, Pandas, etc.
+        - Only first layer exported
+        - Smallest file but less metadata
+        """)
 
 
 
