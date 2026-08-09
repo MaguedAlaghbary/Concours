@@ -30,9 +30,9 @@ selected_location = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # Display title with selected location
-st.title(f"🗺️ Djibouti Nitrate Vulnerability Mapper - {selected_location}")
-st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
-st.info(f"📍 Currently viewing: **{selected_location.upper()}** region")
+st.title(f"🗺️ Nitrate Vulnerability - {selected_location}")
+#st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
+#st.info(f"📍 Currently viewing: **{selected_location.upper()}** region")
 
 # ============================================================================
 # LOAD DATA (TWO LOCATIONS)
@@ -893,14 +893,14 @@ tab_inputs, tab1, tab2, tab3 = st.tabs([
 # ============================================================================
 
 with tab_inputs:
-    st.header("📥 DRASTICLU Input Layers (8 Parameters)")
+    st.header("📥 DRASTICLU Input Layers")
     
     # Single unified selector: Nitrate alone OR a layer with nitrate overlay
     view_options = ["🧪 Nitrate Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
     selected_view = st.selectbox("View:", view_options, key="layer_select")
     
     # Determine if we're viewing nitrate alone or a layer + nitrate
-    show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
+    #show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
     
     if show_nitrate_only:
         # NITRATE ALONE: blank base map + nitrate points
@@ -1003,9 +1003,9 @@ with tab1:
         
         # Concentration layer options
         conc_options = [
-            ("y_hat", "Continuous Concentration (10–100)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
-            ("y_hat_residuals", "Residuals (Prediction Error)", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
-            ("y_hat_class", "Concentration Classes (Binned)", 'y_hat_log_class', None, None, "class"),
+            ("y_hat", "Continuous Concentration [10–100] (mg/L))", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
+            ("y_hat_residuals", "Prediction Error (mg/L))", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
+            ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
             ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
         ]
         
@@ -1052,7 +1052,7 @@ with tab1:
                     norm_residuals = Normalize(vmin=-50, vmax=50)
                     m_conc = add_measurement_residuals_layer(m_conc, df_nitrate_points, cmap_std, norm_residuals)
                     folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
-                    st.success("✓ Ground truth residuals overlaid", icon="🧪")
+                    #st.success("✓ Ground truth residuals overlaid", icon="🧪")
 
             # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
             if conc_layer[0] == "y_hat" and show_ground_truth and m_conc is not None:
@@ -1060,19 +1060,19 @@ with tab1:
                     norm_residuals = Normalize(vmin=-50, vmax=50)
                     m_conc = add_nitrate_layer(m_conc, df_nitrate_points, cmap_nitrate, norm_yhat, True)
                     folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
-                    st.success("✓ Ground truth residuals overlaid", icon="🧪")
+                    #st.success("✓ Ground truth residuals overlaid", icon="🧪")
         
         if m_conc:
             st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
     # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
     with sub_tab_vuln:
-        st.subheader("Groundwater Vulnerability Index (SHAP-based)")
+        st.subheader("Predicted Vulnerability Index")
         
         # Vulnerability layer options
         vuln_options = [
-            ("index_shap", "Continuous Index (80–200)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
-            ("index_shap_std", "Uncertainty (12–26)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
+            ("index_shap", "Vulnerability Index [80–200] (-)", 'index_shap', cmap_vulnerability, Normalize(vmin=80, vmax=200), ""),
+            ("index_shap_std", "Uncertainty [12–26] (-)", 'index_shap_std', cmap_std, Normalize(vmin=12, vmax=26), ""),
             ("index_shap_class", "5-Class (Low–Very High)", 'index_shap_class', None, None, "class"),
             ("index_shap_entropy", "Entropy (0–1)", 'index_shap_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
         ]
@@ -1115,8 +1115,8 @@ with tab2:
     
     # Selectbox to toggle between Risk and Priority
     assessment_options = [
-        ("risk", "Contamination Risk (1–9)", 'risk_pdp_shap', risk_9_colors, RISK_LABELS),
-        ("priority", "Management Priority (1–4)", 'priority_zones_regulatory', priority_4_colors, PRIORITY_LABELS),
+        ("risk", "Contamination Risk Categories (1–9)", 'risk_pdp_shap', risk_9_colors, RISK_LABELS),
+        ("priority", "Management Priority Zones (1–4)", 'priority_zones_regulatory', priority_4_colors, PRIORITY_LABELS),
     ]
     
     selected_assessment = st.selectbox("View:", [f"{opt[1]}" for opt in assessment_options], key="assessment_select")
@@ -1180,10 +1180,10 @@ with tab3:
     # Determine which layer to plot
     if attr_type == "Driver Rank":
         layer_name = f'driver_rank_{rank_num}'
-        title = f"Most Influential Parameter (Rank {rank_num})"
+        title = f"Vulnerability Attributors (Rank {rank_num})"
     else:
         layer_name = f'driver_shap_{rank_num}'
-        title = f"Top SHAP Contributor (Rank {rank_num})"
+        title = f"Concentration Attributors (Rank {rank_num})"
     
     st.info(f"**{title}**")
     
