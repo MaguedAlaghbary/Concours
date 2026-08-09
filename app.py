@@ -638,7 +638,7 @@ col1, col2 = st.sidebar.columns(2)
 with col1:
     lat_input = st.number_input("Latitude", min_value=10.9, max_value=11.4, value=11.0, step=0.01, key="lat_slider")
 with col2:
-    lon_input = st.number_input("Longitude", min_value=41.7, max_value=42.8, value=42.9, step=0.01, key="lon_slider")
+    lon_input = st.number_input("Longitude", min_value=41.7, max_value=42.8, value=42.7, step=0.01, key="lon_slider")
 
 st.sidebar.info(f"**Selected:** {lat_input:.3f}°N, {lon_input:.3f}°E\n**in {location_name}**")
 
