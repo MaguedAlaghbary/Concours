@@ -900,7 +900,7 @@ with tab_inputs:
     selected_view = st.selectbox("View:", view_options, key="layer_select")
     
     # Determine if we're viewing nitrate alone or a layer + nitrate
-    #show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
+    show_nitrate_only = (selected_view == "🧪 Nitrate Measurements Only")
     
     if show_nitrate_only:
         # NITRATE ALONE: blank base map + nitrate points
