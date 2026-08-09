@@ -631,16 +631,16 @@ width, height = 900, 600
 # ============================================================================
 # SIDEBAR: LOCATION INPUT
 # ============================================================================
-st.sidebar.header("📍 Query Location")
+#st.sidebar.header("📍 Query Location")
 st.sidebar.caption(f"🗺️ Region: **{location_name.upper()}**")
 
-col1, col2 = st.sidebar.columns(2)
-with col1:
-    lat_input = st.number_input("Latitude", min_value=10.9, max_value=12.7, value=11.5, step=0.01, key="lat_slider")
-with col2:
-    lon_input = st.number_input("Longitude", min_value=41.7, max_value=43.4, value=42.9, step=0.01, key="lon_slider")
+#col1, col2 = st.sidebar.columns(2)
+#with col1:
+#    lat_input = st.number_input("Latitude", min_value=10.9, max_value=12.7, value=11.5, step=0.01, key="lat_slider")
+#with col2:
+#    lon_input = st.number_input("Longitude", min_value=41.7, max_value=43.4, value=42.9, step=0.01, key="lon_slider")
 
-st.sidebar.info(f"**Selected:** {lat_input:.3f}°N, {lon_input:.3f}°E\n**in {location_name}**")
+#st.sidebar.info(f"**Selected:** {lat_input:.3f}°N, {lon_input:.3f}°E\n**in {location_name}**")
 
 # ============================================================================
 # FUNCTION: Extract values at point
