@@ -85,7 +85,7 @@ def load_both_measurements():
 data_douda, data_bara = load_both_datasets()
 df_douda, df_bara = load_both_measurements()
 
-st.success("✅ Both locations loaded successfully")
+#st.success("✅ Both locations loaded successfully")
 
 # ============================================================================
 # SELECT ACTIVE DATASET BASED ON LOCATION
