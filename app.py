@@ -370,26 +370,6 @@ LANDCOVER_LABEL_MAP = {
     -1: "Merged"
 }
 
-# 9-level risk colormap - Blue-White-Red diverging
-risk_9_colors = {
-    1: '#053061',  # Very Low - Dark blue
-    2: '#2166AC',  # Low - Blue
-    3: '#4393C3',  # Low-Moderate - Light blue
-    4: '#cceeff',  # Moderate-Low - Pale blue
-    5: '#F7F7F7',  # Moderate - White/neutral
-    6: '#F4A582',  # Moderate-High - Pale red
-    7: '#D6604D',  # High-Moderate - Light red
-    8: '#B2182B',  # High - Red
-    9: '#67001F',  # Very High - Dark red
-}
-
-# 4-level priority colormap
-priority_4_colors = {
-    1: '#2166AC',  # Low Risk - Dark blue
-    2: '#cceeff',  # Moderate Risk - Light blue
-    3: '#F4A582',  # High Risk - Light red
-    4: '#B2182B',  # Very High Risk - Dark red
-}
 
 # NOTE: cmap/norm for every class layer (Risk, Priority, defuzzified classes,
 # DRASTICLU categorical inputs, driver rank/SHAP) are now derived automatically
@@ -401,24 +381,7 @@ priority_4_colors = {
 # ============================================================================
 # LABELS
 # ============================================================================
-RISK_LABELS = {
-    1: "Very Low",
-    2: "Low",
-    3: "Low-Moderate",
-    4: "Moderate-Low",
-    5: "Moderate",
-    6: "Moderate-High",
-    7: "High-Moderate",
-    8: "High",
-    9: "Very High"
-}
 
-PRIORITY_LABELS = {
-    1: "Monitor",
-    2: "Prevent",
-    3: "Remediate",
-    4: "Intervene"
-}
 
 DRASTIC_LABELS = {
     'D': 'Depth to Water', 'R': 'Recharge Rate', 'A': 'Aquifer Media',
@@ -440,10 +403,6 @@ DRIVER_MAP = {
 # ============================================================================
 
 PREDICTION_TITLES = {
-    'index_shap': "Specific Vulnerability",
-    'index_shap_std': "Specific Vulnerability: Uncertainty",
-    'index_shap_class': "Defuzzified Specific Vulnerability",
-    'index_shap_entropy_norm': "Defuzzified Specific Vulnerability: Uncertainty",
     'y_hat': "NO₃⁻ Concentrations",
     'y_hat_std': "NO₃⁻ Concentrations: Uncertainty",
     'y_hat_log_class': "Defuzzified NO₃⁻ Contamination",
@@ -494,13 +453,6 @@ except ImportError:
 # CLASS LABELS FOR DEFUZZIFIED MAPS (WITH RANGES)
 # ============================================================================
 
-vulnerability_class_labels = {
-    1: "Very Low (≤100)",
-    2: "Low (100-136)",
-    3: "Moderate (136-166)",
-    4: "High (166-174)",
-    5: "Very High (≥174)"
-}
 
 nitrate_class_labels = {
     1: "Very Low (≤10 mg/L)",
@@ -510,14 +462,7 @@ nitrate_class_labels = {
     5: "Very High (≥100 mg/L)"
 }
 
-# 5-class categorical colormaps (for defuzzified)
-vulnerability_5_colors = {
-    1: '#440154',  # Very Low - Dark purple
-    2: '#31688E',  # Low - Blue
-    3: '#35B779',  # Moderate - Green
-    4: '#FDE724',  # High - Yellow
-    5: '#CC4C02',  # Very High - Dark orange
-}
+
 
 nitrate_5_colors = {
     1: '#FFEDA0',  # Very Low - Light yellow
@@ -1091,42 +1036,32 @@ with tab1:
 
     # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
     with sub_tab_vuln:
-        st.subheader("Predicted Vulnerability Index")
-        
-        # Vulnerability layer options
-        vuln_options = [
+        st.subheader("Predicted Contamination")
+
+        conc_options = [
             ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
-            ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+            ("y_hat_entropy", "Entropy (0鈥�1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), "")
         ]
         
-        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
-        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
-        vuln_layer = vuln_options[vuln_idx]
-        
-        #st.info(f"**{vuln_layer[1]}**")
-        
-        if vuln_layer[2] not in data_xr:
-            st.error(f"❌ Layer {vuln_layer[2]} not found")
-            st.stop()
-        
-        water_mask = _get_water_mask(data_xr)
-        
-        if vuln_layer[5] == "class":
-            # CLASS layer: index_shap_class
-            m_vuln = plot_class_layer(
-                data_xr, vuln_layer[2],
-                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
-                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+        if conc_layer[5] == "class":
+            # CLASS layer: y_hat_log_class (binned concentration predictions)
+            m_conc = plot_class_layer(
+                data_xr, conc_layer[2],
+                class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
+
         else:
-            # CONTINUOUS layers
-            m_vuln = plot_continuous_layer(
-                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
-                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            # CONTINUOUS layers (concentration, residuals/error, entropy)
+            m_conc = plot_continuous_layer(
+                data_xr, conc_layer[2], cmap=conc_layer[3], norm=conc_layer[4],
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
+            
+      
         
-        if m_vuln:
-            st_folium(m_vuln, width=width, height=height, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
+        if m_conc:
+            st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 3: DRIVER ATTRIBUTION ANALYSIS
@@ -1213,7 +1148,7 @@ with st.sidebar.expander("💾 Download Model Data", expanded=False):
     st.write("**Download Format:**")
     download_format = st.radio(
         "Format",
-        options=["NetCDF (.nc)", "GeoTIFF (.tif)", "Pickle (.pkl)", "CSV (tab-delimited)"],
+        options=["NetCDF (.nc)",  "Pickle (.pkl)", "CSV (tab-delimited)"],
         key="download_format_select",
         help="Choose file format for download"
     )
@@ -1247,48 +1182,6 @@ with st.sidebar.expander("💾 Download Model Data", expanded=False):
                             file_data = f.read()
                         filename = f"{location_name.lower()}_model.pkl"
                 
-                elif download_format == "GeoTIFF (.tif)":
-                    st.info("ℹ️ GeoTIFF export requires rasterio library")
-                    st.code("pip install rasterio")
-                    try:
-                        import rasterio
-                        from rasterio.transform import from_bounds
-                        import tempfile
-                        import numpy as np
-                        
-                        # Get first variable for GeoTIFF
-                        var_name = selected_vars[0]
-                        data_array = data_xr[var_name].values
-                        
-                        # Get bounds
-                        lat_min = float(data_xr['latitude'].min())
-                        lat_max = float(data_xr['latitude'].max())
-                        lon_min = float(data_xr['longitude'].min())
-                        lon_max = float(data_xr['longitude'].max())
-                        
-                        # Create transform
-                        transform = from_bounds(lon_min, lat_min, lon_max, lat_max, 
-                                              data_array.shape[1], data_array.shape[0])
-                        
-                        with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as tmp:
-                            with rasterio.open(
-                                tmp.name, 'w',
-                                driver='GTiff',
-                                height=data_array.shape[0],
-                                width=data_array.shape[1],
-                                count=1,
-                                dtype=data_array.dtype,
-                                crs='EPSG:4326',
-                                transform=transform,
-                            ) as dst:
-                                dst.write(data_array, 1)
-                            
-                            with open(tmp.name, 'rb') as f:
-                                file_data = f.read()
-                            filename = f"{location_name.lower()}_model.tif"
-                    except ImportError:
-                        st.error("❌ rasterio not installed. Use NetCDF or Pickle instead.")
-                        st.stop()
                 
                 elif download_format == "CSV (tab-delimited)":
                     # Flatten to CSV (first variable only)
@@ -1343,12 +1236,7 @@ with st.sidebar.expander("💾 Download Model Data", expanded=False):
         - Can reload directly in Python
         - Largest file size
         - Best for Python workflows
-        
-        **GeoTIFF (.tif)**
-        - Geospatial raster format
-        - Opens in: QGIS, ArcGIS, Google Earth
-        - Only first layer exported
-        - Requires rasterio library
+    
         
         **CSV (tab-delimited)**
         - Simple tabular format
