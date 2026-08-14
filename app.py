@@ -1034,11 +1034,11 @@ with tab1:
         if m_conc:
             st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
-    # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
+    # ========== SUB-TAB 1: Contaminataion MAPS ==========
     with sub_tab_conc:
-   st.subheader("Predicted NO₃⁻ Concentration (mg/L)")
+       st.subheader("Predicted NO₃⁻ Contaminataion Categories")
         
-        # Concentration layer options
+        # Contaminataion layer options
         conc_options = [
             ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
             ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
