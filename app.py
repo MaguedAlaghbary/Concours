@@ -1107,19 +1107,12 @@ with tab2:
     }
     
     # Two selectboxes: Attribution Type + Rank Number
-    col_type, col_rank = st.columns([1.5, 1])
-    with col_type:
-        attr_type = st.selectbox("Attribution Type:", ["Driver Rank", "Driver SHAP"], key="attr_type_select")
-    with col_rank:
-        rank_num = st.selectbox("Rank:", [1, 2, 3], key="attr_rank_select")
+    attr_type = "Driver Rank"
+    rank_num = st.selectbox("Rank:", [1, 2, 3], key="attr_rank_select")
     
     # Determine which layer to plot
-    if attr_type == "Driver Rank":
-        layer_name = f'driver_rank_{rank_num}'
-        title = f"Vulnerability Attributors (Rank {rank_num})"
-    else:
-        layer_name = f'driver_shap_{rank_num}'
-        title = f"Concentration Attributors (Rank {rank_num})"
+    layer_name = f'driver_shap_{rank_num}'
+    title = f"Concentration Attributors (Rank {rank_num})"
     
     st.info(f"**{title}**")
     
