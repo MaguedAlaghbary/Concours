@@ -965,7 +965,7 @@ with tab1:
     st.header("📊 Prediction Maps: Concentration & Contamination")
     
     # Create two sub-tabs
-    sub_tab_conc, sub_tab_vuln = st.tabs(["🟠 Concentration", "🔴 Contamination"])
+    sub_tab_conc, sub_tab_conc = st.tabs(["🟠 Concentration", "🔴 Contamination"])
     
    
     # ========== SUB-TAB 2: CONCENTRATION MAPS ==========
@@ -1035,13 +1035,29 @@ with tab1:
             st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
     # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
-    with sub_tab_vuln:
-        st.subheader("Predicted Contamination")
-
+    with sub_tab_conc:
+   st.subheader("Predicted NO₃⁻ Concentration (mg/L)")
+        
+        # Concentration layer options
         conc_options = [
             ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
-            ("y_hat_entropy", "Entropy (0鈥�1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), "")
+            ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
         ]
+        
+        # Layer selector & controls
+        selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="conc_map_select")
+  
+        
+        conc_idx = next(i for i, opt in enumerate(conc_options) if opt[1] == selected_conc)
+        conc_layer = conc_options[conc_idx]
+        
+        #st.info(f"**{conc_layer[1]}**")
+        
+        if conc_layer[2] not in data_xr:
+            st.error(f"❌ Layer {conc_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
         
         if conc_layer[5] == "class":
             # CLASS layer: y_hat_log_class (binned concentration predictions)
@@ -1058,8 +1074,6 @@ with tab1:
                 title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
             
-      
-        
         if m_conc:
             st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
