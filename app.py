@@ -965,7 +965,7 @@ with tab1:
     st.header("📊 Prediction Maps: Concentration & Contamination")
     
     # Create two sub-tabs
-    sub_tab_conc, sub_tab_conc = st.tabs(["🟠 Concentration", "🔴 Contamination"])
+    sub_tab_conc, sub_tab_contam = st.tabs(["🟠 Concentration", "🔴 Contamination"])
     
    
     # ========== SUB-TAB 2: CONCENTRATION MAPS ==========
@@ -1035,8 +1035,8 @@ with tab1:
             st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
     # ========== SUB-TAB 1: Contaminataion MAPS ==========
-    with sub_tab_conc:
-        st.subheader("Predicted NO₃⁻ Contaminataion Categories")
+    with sub_tab_contam:
+        st.subheader("Predicted NO₃⁻ Contamination Categories")
         
         # Contaminataion layer options
         conc_options = [
@@ -1045,37 +1045,37 @@ with tab1:
         ]
         
         # Layer selector & controls
-        selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="conc_map_select")
+        selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="sub_tab_contam")
   
         
-        conc_idx = next(i for i, opt in enumerate(conc_options) if opt[1] == selected_conc)
-        conc_layer = conc_options[conc_idx]
+        contam_idx = next(i for i, opt in enumerate(conc_options)...)
+        contam_layer = conc_options[contam_idx]
         
         #st.info(f"**{conc_layer[1]}**")
         
-        if conc_layer[2] not in data_xr:
-            st.error(f"❌ Layer {conc_layer[2]} not found")
+        if contam_layer[2] not in data_xr:
+            st.error(f"❌ Layer {contam_layer[2]} not found")
             st.stop()
         
         water_mask = _get_water_mask(data_xr)
         
-        if conc_layer[5] == "class":
+        if contam_layer[5] == "class":
             # CLASS layer: y_hat_log_class (binned concentration predictions)
-            m_conc = plot_class_layer(
-                data_xr, conc_layer[2],
+            m_contam = plot_class_layer(
+                data_xr, contam_layer[2],
                 class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
-                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+                title=contam_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
 
         else:
             # CONTINUOUS layers (concentration, residuals/error, entropy)
-            m_conc = plot_continuous_layer(
-                data_xr, conc_layer[2], cmap=conc_layer[3], norm=conc_layer[4],
-                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            m_contam = plot_continuous_layer(
+                data_xr, contam_layer[2], cmap=contam_layer[3], norm=contam_layer[4],
+                title=contam_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
             
-        if m_conc:
-            st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+        if m_contam:
+            st_folium(m_contam, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 3: DRIVER ATTRIBUTION ANALYSIS
