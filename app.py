@@ -962,7 +962,7 @@ with tab_inputs:
 # TAB 1: PREDICTION MAPS —  CONCENTRATION & Contaminations
 # ============================================================================
 with tab1:
-    st.header("📊 Prediction Maps: Concentration & Contamination")
+    #st.header("📊 Prediction Maps: Concentration & Contamination")
     
     # Create two sub-tabs
     sub_tab_conc, sub_tab_contam = st.tabs(["🟠 Concentration", "🔴 Contamination"])
