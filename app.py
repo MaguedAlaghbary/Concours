@@ -1036,7 +1036,7 @@ with tab1:
 
     # ========== SUB-TAB 1: Contaminataion MAPS ==========
     with sub_tab_conc:
-       st.subheader("Predicted NO₃⁻ Contaminataion Categories")
+        st.subheader("Predicted NO₃⁻ Contaminataion Categories")
         
         # Contaminataion layer options
         conc_options = [
