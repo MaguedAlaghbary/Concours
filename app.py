@@ -1014,78 +1014,119 @@ with tab_inputs:
 
 
 # ============================================================================
-# TAB 1: PREDICTION MAPS — VULNERABILITY & CONCENTRATION
+# TAB 1: PREDICTION MAPS —  CONCENTRATION & Contaminations
 # ============================================================================
 with tab1:
-    st.header("Prediction Maps: Concentration")
+    st.header("📊 Prediction Maps: Concentration & Contamination")
     
+    # Create two sub-tabs
+    sub_tab_conc, sub_tab_vuln = st.tabs(["🟠 Concentration", "🔴 Contamination"])
+    
+   
     # ========== SUB-TAB 2: CONCENTRATION MAPS ==========
-    st.subheader("Predicted NO₃⁻ Concentration (mg/L)")
-    
-    # Concentration layer options
-    conc_options = [
-        ("y_hat", "Continuous Concentration [10–100] (mg/L)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
-        ("y_hat_residuals", "Prediction Error (mg/L)", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
-        ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
-        ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
-    ]
-    
-    # Layer selector & controls
-    col_view, col_toggle = st.columns([2, 1])
-    with col_view:
-        selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="conc_map_select")
-    with col_toggle:
-        show_ground_truth = st.checkbox("📍 Ground Truth", value=True, key="show_gt_conc")
-    
-    conc_idx = next(i for i, opt in enumerate(conc_options) if opt[1] == selected_conc)
-    conc_layer = conc_options[conc_idx]
-    
-    #st.info(f"**{conc_layer[1]}**")
-    
-    if conc_layer[2] not in data_xr:
-        st.error(f"❌ Layer {conc_layer[2]} not found")
-        st.stop()
-    
-    water_mask = _get_water_mask(data_xr)
-    
-    if conc_layer[5] == "class":
-        # CLASS layer: y_hat_log_class (binned concentration predictions)
-        m_conc = plot_class_layer(
-            data_xr, conc_layer[2],
-            class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
-            title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-        )
-        # Overlay measurement ground truth classes (pre-calculated in df) if toggled on
-        if show_ground_truth and m_conc and df_nitrate_points is not None and not df_nitrate_points.empty:
-            m_conc = add_measurement_classes_layer(m_conc, df_nitrate_points, nitrate_5_colors, nitrate_class_labels)
-            folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
-            #st.success("✓ Ground truth classes overlaid", icon="🧪")
-    else:
-        # CONTINUOUS layers (concentration, residuals/error, entropy)
-        m_conc = plot_continuous_layer(
-            data_xr, conc_layer[2], cmap=conc_layer[3], norm=conc_layer[4],
-            title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
-        )
+    with sub_tab_conc:
+        st.subheader("Predicted NO₃⁻ Concentration (mg/L)")
         
-        # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
-        if conc_layer[0] == "y_hat_residuals" and show_ground_truth and m_conc is not None:
-            if df_nitrate_points is not None and not df_nitrate_points.empty:
-                norm_residuals = Normalize(vmin=-50, vmax=50)
-                m_conc = add_measurement_residuals_layer(m_conc, df_nitrate_points, cmap_std, norm_residuals)
+        # Concentration layer options
+        conc_options = [
+            ("y_hat", "Continuous Concentration [10–100] (mg/L)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
+            ("y_hat_residuals", "Prediction Error (mg/L)", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
+        ]
+        
+        # Layer selector & controls
+        col_view, col_toggle = st.columns([2, 1])
+        with col_view:
+            selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="conc_map_select")
+        with col_toggle:
+            show_ground_truth = st.checkbox("📍 Ground Truth", value=True, key="show_gt_conc")
+        
+        conc_idx = next(i for i, opt in enumerate(conc_options) if opt[1] == selected_conc)
+        conc_layer = conc_options[conc_idx]
+        
+        #st.info(f"**{conc_layer[1]}**")
+        
+        if conc_layer[2] not in data_xr:
+            st.error(f"❌ Layer {conc_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if conc_layer[5] == "class":
+            # CLASS layer: y_hat_log_class (binned concentration predictions)
+            m_conc = plot_class_layer(
+                data_xr, conc_layer[2],
+                class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+            # Overlay measurement ground truth classes (pre-calculated in df) if toggled on
+            if show_ground_truth and m_conc and df_nitrate_points is not None and not df_nitrate_points.empty:
+                m_conc = add_measurement_classes_layer(m_conc, df_nitrate_points, nitrate_5_colors, nitrate_class_labels)
                 folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
-                #st.success("✓ Ground truth residuals overlaid", icon="🧪")
+                #st.success("✓ Ground truth classes overlaid", icon="🧪")
+        else:
+            # CONTINUOUS layers (concentration, residuals/error, entropy)
+            m_conc = plot_continuous_layer(
+                data_xr, conc_layer[2], cmap=conc_layer[3], norm=conc_layer[4],
+                title=conc_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+            
+            # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
+            if conc_layer[0] == "y_hat_residuals" and show_ground_truth and m_conc is not None:
+                if df_nitrate_points is not None and not df_nitrate_points.empty:
+                    norm_residuals = Normalize(vmin=-50, vmax=50)
+                    m_conc = add_measurement_residuals_layer(m_conc, df_nitrate_points, cmap_std, norm_residuals)
+                    folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
+                    #st.success("✓ Ground truth residuals overlaid", icon="🧪")
 
-        # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
-        if conc_layer[0] == "y_hat" and show_ground_truth and m_conc is not None:
-            if df_nitrate_points is not None and not df_nitrate_points.empty:
-                norm_residuals = Normalize(vmin=-50, vmax=50)
-                m_conc = add_nitrate_layer(m_conc, df_nitrate_points, cmap_nitrate, norm_yhat, True)
-                folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
-                #st.success("✓ Ground truth residuals overlaid", icon="🧪")
-    
-    if m_conc:
-        st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+            # Overlay measurement residuals on Residuals map (pre-calculated in df) if toggled on
+            if conc_layer[0] == "y_hat" and show_ground_truth and m_conc is not None:
+                if df_nitrate_points is not None and not df_nitrate_points.empty:
+                    norm_residuals = Normalize(vmin=-50, vmax=50)
+                    m_conc = add_nitrate_layer(m_conc, df_nitrate_points, cmap_nitrate, norm_yhat, True)
+                    folium.LayerControl().add_to(m_conc)  # Add layer control AFTER overlay
+                    #st.success("✓ Ground truth residuals overlaid", icon="🧪")
+        
+        if m_conc:
+            st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
+    # ========== SUB-TAB 1: VULNERABILITY MAPS ==========
+    with sub_tab_vuln:
+        st.subheader("Predicted Vulnerability Index")
+        
+        # Vulnerability layer options
+        vuln_options = [
+            ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
+            ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
+        ]
+        
+        selected_vuln = st.selectbox("View:", [f"{opt[1]}" for opt in vuln_options], key="vuln_map_select")
+        vuln_idx = next(i for i, opt in enumerate(vuln_options) if opt[1] == selected_vuln)
+        vuln_layer = vuln_options[vuln_idx]
+        
+        #st.info(f"**{vuln_layer[1]}**")
+        
+        if vuln_layer[2] not in data_xr:
+            st.error(f"❌ Layer {vuln_layer[2]} not found")
+            st.stop()
+        
+        water_mask = _get_water_mask(data_xr)
+        
+        if vuln_layer[5] == "class":
+            # CLASS layer: index_shap_class
+            m_vuln = plot_class_layer(
+                data_xr, vuln_layer[2],
+                class_colors=vulnerability_5_colors, class_labels=vulnerability_class_labels,
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        else:
+            # CONTINUOUS layers
+            m_vuln = plot_continuous_layer(
+                data_xr, vuln_layer[2], cmap=vuln_layer[3], norm=vuln_layer[4],
+                title=vuln_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
+            )
+        
+        if m_vuln:
+            st_folium(m_vuln, width=width, height=height, key=f"vuln_{vuln_layer[0]}_{lat_input}_{lon_input}")
 
 # ============================================================================
 # TAB 3: DRIVER ATTRIBUTION ANALYSIS
