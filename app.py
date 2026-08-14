@@ -1085,7 +1085,7 @@ with tab2:
     
     # Verify driver layers exist (fail fast with one clear message)
     try:
-        for i in range(1, 4):
+        for i in range(1, 9):
             _ = data_xr[f'driver_rank_{i}']
             _ = data_xr[f'driver_shap_{i}']
     except KeyError:
