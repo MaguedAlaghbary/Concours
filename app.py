@@ -1086,7 +1086,6 @@ with tab2:
     # Verify driver layers exist (fail fast with one clear message)
     try:
         for i in range(1, 4):
-            _ = data_xr[f'driver_rank_{i}']
             _ = data_xr[f'driver_shap_{i}']
     except KeyError:
         st.error("Cannot load driver data")
@@ -1111,7 +1110,7 @@ with tab2:
     rank_num = st.selectbox("Rank:", [1, 2, 3, 4, 5, 6, 7, 8], key="attr_rank_select")
     
     # Determine which layer to plot
-    layer_name = f'driver_rank_{rank_num}'
+    layer_name = f'driver_shap_{rank_num}'
     title = f"Concentration Attributors (Rank {rank_num})"
     
     st.info(f"**{title}**")
