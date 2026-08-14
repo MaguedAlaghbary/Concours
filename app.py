@@ -1077,19 +1077,24 @@ with tab1:
         if m_contam:
             st_folium(m_contam, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
+
 # ============================================================================
-# TAB 3: DRIVER ATTRIBUTION ANALYSIS
+# TAB 2: DRIVER ATTRIBUTION ANALYSIS (SINGLE SELECTED RANK)
 # ============================================================================
 with tab2:
-    st.header("Driver Attribution Analysis")
+    st.header("🎯 Driver SHAP Attribution Analysis")
     
-    # Verify driver layers exist (fail fast with one clear message)
-    try:
-        for i in range(1, 4):
-            _ = data_xr[f'driver_shap_{i}']
-    except KeyError:
-        st.error("Cannot load driver data")
+    # Rank selector
+    rank_num = st.selectbox("Select Rank:", options=[1, 2, 3, 4, 5, 6, 7, 8], 
+                           key="attr_rank_select", help="Choose driver ranking position")
+    
+    # Verify layer exists
+    layer_name = f'driver_shap_{rank_num}'
+    if layer_name not in data_xr:
+        st.error(f"❌ Layer {layer_name} not found")
         st.stop()
+    
+    st.info(f"**Rank {rank_num}: SHAP Driver Attribution**")
     
     water_mask = _get_water_mask(data_xr)
     
@@ -1105,26 +1110,50 @@ with tab2:
         7: parameters_8_colors[8],  # LU
     }
     
-    # Two selectboxes: Attribution Type + Rank Number
-    attr_type = "Driver Rank"
-    rank_num = st.selectbox("Rank:", [1, 2, 3, 4, 5, 6, 7, 8], key="attr_rank_select")
-    
-    # Determine which layer to plot
-    layer_name = f'driver_shap_{rank_num}'
-    title = f"Concentration Attributors (Rank {rank_num})"
-    
-    st.info(f"**{title}**")
+    title = f"Driver SHAP Contribution (Rank {rank_num})"
     
     # Render the driver attribution map
-    m_driver = plot_class_layer(
-        data_xr, layer_name,
-        class_colors=driver_colors, class_labels=DRIVER_MAP,
-        title=title, lat=lat_input, lon=lon_input,
-        water_mask=water_mask, figsize=(8, 8)
-    )
+    try:
+        m_driver = plot_class_layer(
+            data_xr, layer_name,
+            class_colors=driver_colors, class_labels=DRIVER_MAP,
+            title=title, lat=lat_input, lon=lon_input,
+            water_mask=water_mask, figsize=(8, 8)
+        )
+        
+        if m_driver:
+            st_folium(m_driver, width=width, height=height, 
+                     key=f"driver_shap_{rank_num}_{lat_input}_{lon_input}")
+        else:
+            st.error("❌ Map failed to render")
     
-    if m_driver:
-        st_folium(m_driver, width=width, height=height, key=f"driver_{attr_type}_{rank_num}_{lat_input}_{lon_input}")
+    except Exception as e:
+        st.error(f"❌ Error rendering map: {str(e)}")
+    
+    # Legend
+    st.markdown("---")
+    st.subheader("📋 Parameter Color Guide (Paul Tol Bright)")
+    
+    legend_cols = st.columns(4)
+    param_list = [
+        ('D', 'Depth to Water', 1),
+        ('R', 'Recharge', 2),
+        ('A', 'Aquifer Media', 3),
+        ('S', 'Soil Media', 4),
+        ('T', 'Topography', 5),
+        ('I', 'Impact Vadose', 6),
+        ('C', 'Conductivity', 7),
+        ('LU', 'Land Use', 8),
+    ]
+    
+    for idx, (code, name, param_num) in enumerate(param_list):
+        with legend_cols[idx % 4]:
+            color = parameters_8_colors[param_num]
+            st.markdown(
+                f'<div style="padding: 8px; background-color: {color}; color: white; border-radius: 4px; text-align: center; font-weight: bold;">'
+                f'{code}<br><span style="font-size: 9px;">{name}</span></div>',
+                unsafe_allow_html=True
+            )
     
    
 # ============================================================================
