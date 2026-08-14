@@ -1108,7 +1108,7 @@ with tab2:
     
     # Two selectboxes: Attribution Type + Rank Number
     attr_type = "Driver Rank"
-    rank_num = st.selectbox("Rank:", [1, 2, 3], key="attr_rank_select")
+    rank_num = st.selectbox("Rank:", [1, 2, 3, 4, 5, 6, 7, 8], key="attr_rank_select")
     
     # Determine which layer to plot
     layer_name = f'driver_shap_{rank_num}'
