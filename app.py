@@ -1082,7 +1082,7 @@ with tab1:
 # TAB 2: DRIVER ATTRIBUTION ANALYSIS (SINGLE SELECTED RANK)
 # ============================================================================
 with tab2:
-    st.header("🎯 Driver SHAP Attribution Analysis")
+    st.header("Driver SHAP Attribution Analysis")
     
     # Rank selector
     rank_num = st.selectbox("Select Rank:", options=[1, 2, 3, 4, 5, 6, 7, 8], 
@@ -1130,30 +1130,7 @@ with tab2:
     except Exception as e:
         st.error(f"❌ Error rendering map: {str(e)}")
     
-    # Legend
-    st.markdown("---")
-    st.subheader("📋 Parameter Color Guide (Paul Tol Bright)")
-    
-    legend_cols = st.columns(4)
-    param_list = [
-        ('D', 'Depth to Water', 1),
-        ('R', 'Recharge', 2),
-        ('A', 'Aquifer Media', 3),
-        ('S', 'Soil Media', 4),
-        ('T', 'Topography', 5),
-        ('I', 'Impact Vadose', 6),
-        ('C', 'Conductivity', 7),
-        ('LU', 'Land Use', 8),
-    ]
-    
-    for idx, (code, name, param_num) in enumerate(param_list):
-        with legend_cols[idx % 4]:
-            color = parameters_8_colors[param_num]
-            st.markdown(
-                f'<div style="padding: 8px; background-color: {color}; color: white; border-radius: 4px; text-align: center; font-weight: bold;">'
-                f'{code}<br><span style="font-size: 9px;">{name}</span></div>',
-                unsafe_allow_html=True
-            )
+   
     
    
 # ============================================================================
