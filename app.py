@@ -30,7 +30,7 @@ selected_location = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # Display title with selected location
-st.title(f"🗺️ Nitrate Vulnerability - {selected_location}")
+st.title(f"Nitrate Assessment - {selected_location}")
 #st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
 #st.info(f"📍 Currently viewing: **{selected_location.upper()}** region")
 
