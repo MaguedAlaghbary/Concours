@@ -864,7 +864,7 @@ tab_inputs, tab1, tab2 = st.tabs([
 # ============================================================================
 
 with tab_inputs:
-    st.header("DRASTICLU Input Layers")
+    #st.header("DRASTICLU Input Layers")
     
     # Single unified selector: Nitrate alone OR a layer with nitrate overlay
     view_options = ["NO₃⁻ Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
