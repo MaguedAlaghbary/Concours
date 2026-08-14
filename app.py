@@ -30,7 +30,7 @@ selected_location = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # Display title with selected location
-st.title(f"Nitrate Assessment - {selected_location}")
+st.title(f"NO₃⁻ Assessment - {selected_location}")
 #st.markdown("**DRASTICLU + ML-based assessment with full prediction analysis**")
 #st.info(f"📍 Currently viewing: **{selected_location.upper()}** region")
 
@@ -63,7 +63,7 @@ def load_both_measurements():
         df_douda = pd.read_csv('douda_results.csv')
         df_douda.columns = df_douda.columns.str.strip().str.lower()
     except FileNotFoundError:
-        st.warning("⚠️ Nitrate measurements file not found: douda_results.csv")
+        st.warning("⚠️ NO₃⁻ measurements file not found: douda_results.csv")
         df_douda = None
     except Exception as e:
         st.warning(f"⚠️ Error loading douda data: {str(e)}")
@@ -73,7 +73,7 @@ def load_both_measurements():
         df_bara = pd.read_csv('bara_results.csv')
         df_bara.columns = df_bara.columns.str.strip().str.lower()
     except FileNotFoundError:
-        st.warning("⚠️ Nitrate measurements file not found: bara_results.csv")
+        st.warning("⚠️ NO₃⁻ measurements file not found: bara_results.csv")
         df_bara = None
     except Exception as e:
         st.warning(f"⚠️ Error loading bara data: {str(e)}")
@@ -144,7 +144,7 @@ def add_nitrate_layer(m, df_nitrate, cmap, norm_obj, show_points=True):
         st.write(f"Available columns: {list(df_nitrate.columns)}")
         return m
     
-    fg_nitrate = folium.FeatureGroup(name='🧪 Nitrate Measurements (mg/L)', show=True)
+    fg_nitrate = folium.FeatureGroup(name='NO₃⁻ Measurements (mg/L)', show=True)
     count = 0
     
     for idx, row in df_nitrate.iterrows():
@@ -867,11 +867,11 @@ with tab_inputs:
     st.header("DRASTICLU Input Layers")
     
     # Single unified selector: Nitrate alone OR a layer with nitrate overlay
-    view_options = ["Nitrate Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
+    view_options = ["NO₃⁻ Measurements Only"] + [f"{c['layer']} — {c['title']}" for c in INPUT_LAYERS_CONFIG]
     selected_view = st.selectbox("View:", view_options, key="layer_select")
     
     # Determine if we're viewing nitrate alone or a layer + nitrate
-    show_nitrate_only = (selected_view == "Nitrate Measurements Only")
+    show_nitrate_only = (selected_view == "NO₃⁻ Measurements Only")
     
     if show_nitrate_only:
         # NITRATE ALONE: blank base map + nitrate points
@@ -885,9 +885,9 @@ with tab_inputs:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
             folium.LayerControl().add_to(m)  # Add layer control AFTER adding layers
-            #st.success("✓ Nitrate measurements displayed", icon="🧪")
+            #st.success("✓ NO₃⁻ measurements displayed", icon="🧪")
         else:
-            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
+            st.warning("⚠️ NO₃⁻ measurement data not loaded", icon="🧪")
     else:
         # LAYER + NITRATE: pick the selected layer and overlay nitrate
         layer_idx = view_options.index(selected_view) - 1  # Offset by 1 (nitrate is first)
@@ -949,9 +949,9 @@ with tab_inputs:
             norm_yhat = Normalize(vmin=10, vmax=100)
             m = add_nitrate_layer(m, df_nitrate_points, cmap_nitrate, norm_yhat, True)
             folium.LayerControl().add_to(m)  # ← NOW overlay is visible
-            #st.success(f"✓ Nitrate overlaid on {config['layer'].upper()}", icon="🧪")
+            #st.success(f"✓ NO₃⁻ overlaid on {config['layer'].upper()}", icon="🧪")
         else:
-            st.warning("⚠️ Nitrate measurement data not loaded", icon="🧪")
+            st.warning("⚠️ NO₃⁻ measurement data not loaded", icon="🧪")
     
     # Render map FULL-WIDTH as main figure
     if m:
@@ -974,7 +974,7 @@ with tab1:
         
         # Concentration layer options
         conc_options = [
-            ("y_hat", "Continuous Concentration [10–100] (mg/L)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
+            ("y_hat", "NO₃⁻ Concentration [10–100] (mg/L)", 'y_hat', cmap_nitrate, Normalize(vmin=10, vmax=100), ""),
             ("y_hat_residuals", "Prediction Error (mg/L)", 'y_hat_std', cmap_std, Normalize(vmin=5, vmax=40), ""),
         ]
         
