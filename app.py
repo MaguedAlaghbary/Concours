@@ -1034,24 +1034,25 @@ with tab1:
         if m_conc:
             st_folium(m_conc, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
 
-    # ========== SUB-TAB 1: Contaminataion MAPS ==========
+    # ========== SUB-TAB 1: Contaminataion MAPS ==========#
     with sub_tab_contam:
         st.subheader("Predicted NO₃⁻ Contamination Categories")
         
-        # Contaminataion layer options
-        conc_options = [
+        # Contamination layer options
+        contam_options = [
             ("y_hat_class", "Concentration Classes", 'y_hat_log_class', None, None, "class"),
             ("y_hat_entropy", "Entropy (0–1)", 'y_hat_log_entropy_norm', cmap_entropy, Normalize(vmin=0, vmax=1), ""),
         ]
         
         # Layer selector & controls
-        selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="sub_tab_contam")
-  
+        col_view, col_toggle = st.columns([2, 1])
+        with col_view:
+            selected_contam = st.selectbox("View:", [f"{opt[1]}" for opt in contam_options], key="contam_map_select")
+        with col_toggle:
+            show_ground_truth_contam = st.checkbox("📍 Ground Truth", value=True, key="show_gt_contam")
         
-        contam_idx = next(i for i, opt in enumerate(conc_options)...)
-        contam_layer = conc_options[contam_idx]
-        
-        #st.info(f"**{conc_layer[1]}**")
+        contam_idx = next(i for i, opt in enumerate(contam_options) if opt[1] == selected_contam)
+        contam_layer = contam_options[contam_idx]
         
         if contam_layer[2] not in data_xr:
             st.error(f"❌ Layer {contam_layer[2]} not found")
@@ -1066,16 +1067,15 @@ with tab1:
                 class_colors=nitrate_5_colors, class_labels=nitrate_class_labels,
                 title=contam_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
-
         else:
-            # CONTINUOUS layers (concentration, residuals/error, entropy)
+            # CONTINUOUS layer: entropy
             m_contam = plot_continuous_layer(
                 data_xr, contam_layer[2], cmap=contam_layer[3], norm=contam_layer[4],
                 title=contam_layer[1], lat=lat_input, lon=lon_input, water_mask=water_mask, figsize=(8, 8)
             )
-            
+        
         if m_contam:
-            st_folium(m_contam, width=width, height=height, key=f"conc_{conc_layer[0]}_{lat_input}_{lon_input}")
+            st_folium(m_contam, width=width, height=height, key=f"contam_{contam_layer[0]}_{lat_input}_{lon_input}"))
 
 # ============================================================================
 # TAB 3: DRIVER ATTRIBUTION ANALYSIS
