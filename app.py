@@ -1048,7 +1048,7 @@ with tab1:
         selected_conc = st.selectbox("View:", [f"{opt[1]}" for opt in conc_options], key="sub_tab_contam")
   
         
-        contam_idx = next(i for i, opt in enumerate(conc_options)...)
+        contam_idx = next(i for i, opt in enumerate(conc_options)if opt[1] == selected_conc)
         contam_layer = conc_options[contam_idx]
         
         #st.info(f"**{conc_layer[1]}**")
