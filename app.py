@@ -1111,7 +1111,7 @@ with tab2:
     rank_num = st.selectbox("Rank:", [1, 2, 3, 4, 5, 6, 7, 8], key="attr_rank_select")
     
     # Determine which layer to plot
-    layer_name = f'driver_shap_{rank_num}'
+    layer_name = f'driver_rank_{rank_num}'
     title = f"Concentration Attributors (Rank {rank_num})"
     
     st.info(f"**{title}**")
